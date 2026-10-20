@@ -15,6 +15,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var onSelect: (AnyHashable?) -> Void = { _ in }
     private var onToggleExpanded: (AnyHashable) -> Void = { _ in }
     private var onMove: (AnyHashable, AnyHashable, TreeMovePlacement) -> Void = { _, _, _ in }
+    private var onCreateSibling: (AnyHashable?) -> AnyHashable? = { _ in nil }
     private var onRowInteraction: (AnyHashable) -> Void = { _ in }
     private var dragTokensByID: [AnyHashable: String] = [:]
     private var dragIDsByToken: [String: AnyHashable] = [:]
@@ -56,6 +57,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.outlineTableColumn = column
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         scrollView.documentView = outlineView
         container.addSubview(scrollView)
         NSLayoutConstraint.activate([
@@ -75,14 +77,17 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onSelect newOnSelect: @escaping (AnyHashable?) -> Void,
         onToggleExpanded newOnToggleExpanded: @escaping (AnyHashable) -> Void,
         onMove newOnMove: @escaping (AnyHashable, AnyHashable, TreeMovePlacement) -> Void,
+        onCreateSibling newOnCreateSibling: @escaping (AnyHashable?) -> AnyHashable?,
         onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void
     ) {
         canMove = newCanMove
         onSelect = newOnSelect
         onToggleExpanded = newOnToggleExpanded
         onMove = newOnMove
+        onCreateSibling = newOnCreateSibling
         onRowInteraction = newOnRowInteraction
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
 
         let treeChanged = root == nil || projection.structureSignature != TreeStructureSignature(newRoot)
         let searchChanged = searchText != newSearchText
@@ -151,6 +156,14 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         for id in newIDs.subtracting(oldIDs).sorted(by: { projection.depth(of: $0) < projection.depth(of: $1) }) {
             if let item = projection.itemsByID[id], !item.children.isEmpty, !outlineView.isItemExpanded(item) { outlineView.expandItem(item) }
         }
+    }
+
+    private func handleReturnKey() {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let current = outlineView.selectedRow >= 0
+            ? (outlineView.item(atRow: outlineView.selectedRow) as? TreeOutlineItem)?.snapshot.id
+            : nil
+        _ = onCreateSibling(current)
     }
 
     private func synchronizeSelection(_ id: AnyHashable?) {
@@ -267,6 +280,15 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
 private final class TreeOutlineView: NSOutlineView {
     var onRowMouseDown: ((AnyHashable) -> Void)?
+    var onReturn: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        if (event.keyCode == 36 || event.keyCode == 76), event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            onReturn?()
+            return
+        }
+        super.keyDown(with: event)
+    }
 
     override func frameOfOutlineCell(atRow row: Int) -> NSRect {
         let frame = super.frameOfOutlineCell(atRow: row)

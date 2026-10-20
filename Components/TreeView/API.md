@@ -35,6 +35,13 @@ The supplied `root` is rendered as the visible root row. The component rebuilds 
 
 Keep app-specific icons, thumbnails, row metrics, and other presentation choices in the host's row builder rather than in this package.
 
+## Keyboard creation and editing
+
+- `onCreateSibling(currentID)` is called for Return/Enter when no row editor is active. The host creates and returns the new node ID; pass `nil` to create at the top level when no row is selected.
+- `editingID` is the host-controlled ID of the row being edited. The component selects the newly created node and marks it as editing.
+- `TreeRowContext.isEditing` lets the host render an inline editor. Call `onRename(title)` to persist the edited title and `onSubmitEditing()` on Enter to create the next sibling and continue typing.
+- Creation is disabled while search filtering is active, because the filtered projection is not a safe basis for mutation placement.
+
 ## Moving nodes
 
 - `canMove(sourceID, targetID, placement)` is required and must be a pure validation callback. It must not mutate or persist the model.
