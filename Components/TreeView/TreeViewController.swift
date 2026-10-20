@@ -112,10 +112,15 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
         let treeChanged = root == nil || projection.structureSignature != TreeStructureSignature(newRoot)
         let searchChanged = searchText != newSearchText
-        let selectedChanged = selectedID != newSelectedID || selectedIDs != newSelectedIDs
+        let primarySelectionChanged = selectedID != newSelectedID
+        let selectedChanged = primarySelectionChanged || (!newSelectedIDs.isEmpty && selectedIDs != newSelectedIDs)
         let expansionChanged = targetExpandedIDs != newExpandedIDs
+        if !newSelectedIDs.isEmpty {
+            selectedIDs = newSelectedIDs
+        } else if primarySelectionChanged {
+            selectedIDs = newSelectedID.map { [$0] } ?? []
+        }
         selectedID = newSelectedID
-        selectedIDs = newSelectedIDs.isEmpty && newSelectedID != nil ? [newSelectedID!] : newSelectedIDs
         searchText = newSearchText
 
         let previousScrollOrigin = scrollView.contentView.bounds.origin
