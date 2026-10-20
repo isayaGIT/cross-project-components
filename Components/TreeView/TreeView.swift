@@ -49,6 +49,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     @Binding private var selection: Node.ID?
     @Binding private var expandedIDs: Set<Node.ID>
     @Binding private var editingID: Node.ID?
+    @Binding private var selectedIDs: Set<Node.ID>
     public let searchText: String
     private let searchableText: (Node) -> String
     private let rowHeight: (Node, Int) -> CGFloat
@@ -57,6 +58,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     private let onMove: (Node.ID, Node.ID, TreeMovePlacement) -> Void
     private let onCreateSibling: (Node.ID?) -> Node.ID?
     private let onRename: (Node.ID, String) -> Void
+    private let contentCount: (Node) -> Int
+    private let onDelete: ([Node.ID]) -> Void
+    private let onIndent: ([Node.ID]) -> Void
+    private let onOutdent: ([Node.ID]) -> Void
     private let onRowInteraction: (Node.ID) -> Void
     private let interactiveHitTest: (Node, CGPoint, CGSize) -> Bool
     private let rowContent: (TreeRowContext<Node>) -> RowContent
@@ -66,6 +71,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         selection: Binding<Node.ID?>,
         expandedIDs: Binding<Set<Node.ID>>,
         editingID: Binding<Node.ID?> = .constant(nil),
+        selectedIDs: Binding<Set<Node.ID>> = .constant([]),
         searchText: String = "",
         searchableText: @escaping (Node) -> String = { $0.treeTitle },
         rowHeight: @escaping (Node, Int) -> CGFloat = { _, _ in 32 },
@@ -74,6 +80,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         onMove: @escaping (Node.ID, Node.ID, TreeMovePlacement) -> Void,
         onCreateSibling: @escaping (Node.ID?) -> Node.ID? = { _ in nil },
         onRename: @escaping (Node.ID, String) -> Void = { _, _ in },
+        contentCount: @escaping (Node) -> Int = { _ in 0 },
+        onDelete: @escaping ([Node.ID]) -> Void = { _ in },
+        onIndent: @escaping ([Node.ID]) -> Void = { _ in },
+        onOutdent: @escaping ([Node.ID]) -> Void = { _ in },
         onRowInteraction: @escaping (Node.ID) -> Void = { _ in },
         interactiveHitTest: @escaping (Node, CGPoint, CGSize) -> Bool = { _, _, _ in false },
         @ViewBuilder rowContent: @escaping (TreeRowContext<Node>) -> RowContent
@@ -82,6 +92,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self._selection = selection
         self._expandedIDs = expandedIDs
         self._editingID = editingID
+        self._selectedIDs = selectedIDs
         self.searchText = searchText
         self.searchableText = searchableText
         self.rowHeight = rowHeight
@@ -90,6 +101,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self.onMove = onMove
         self.onCreateSibling = onCreateSibling
         self.onRename = onRename
+        self.contentCount = contentCount
+        self.onDelete = onDelete
+        self.onIndent = onIndent
+        self.onOutdent = onOutdent
         self.onRowInteraction = onRowInteraction
         self.interactiveHitTest = interactiveHitTest
         self.rowContent = rowContent
@@ -101,6 +116,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         controller.update(
             root: makeSnapshot(),
             selectedID: selection.map(AnyHashable.init),
+            selectedIDs: Set(selectedIDs.map(AnyHashable.init)),
             expandedIDs: Set(expandedIDs.map(AnyHashable.init)),
             searchText: searchText,
             canMove: canMoveErased,
@@ -108,6 +124,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onToggleExpanded: toggleExpanded,
             onMove: moveErased,
             onCreateSibling: createSiblingErased,
+            onSelectMultiple: { ids in self.selectedIDs = Set(ids.compactMap { $0.base as? Node.ID }) },
+            onDelete: deleteErased,
+            onIndent: indentErased,
+            onOutdent: outdentErased,
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
@@ -121,6 +141,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         controller.update(
             root: makeSnapshot(),
             selectedID: selection.map(AnyHashable.init),
+            selectedIDs: Set(selectedIDs.map(AnyHashable.init)),
             expandedIDs: Set(expandedIDs.map(AnyHashable.init)),
             searchText: searchText,
             canMove: canMoveErased,
@@ -128,6 +149,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onToggleExpanded: toggleExpanded,
             onMove: moveErased,
             onCreateSibling: createSiblingErased,
+            onSelectMultiple: { ids in self.selectedIDs = Set(ids.compactMap { $0.base as? Node.ID }) },
+            onDelete: deleteErased,
+            onIndent: indentErased,
+            onOutdent: outdentErased,
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
@@ -157,8 +182,30 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         let typedID = id?.base as? Node.ID
         guard let newID = onCreateSibling(typedID) else { return nil }
         selection = newID
+        selectedIDs = [newID]
         editingID = newID
         return AnyHashable(newID)
+    }
+
+    private func deleteErased(_ ids: [AnyHashable]) {
+        let typed = ids.compactMap { $0.base as? Node.ID }
+        guard !typed.isEmpty else { return }
+        onDelete(typed)
+        selection = nil
+        selectedIDs = []
+        editingID = nil
+    }
+
+    private func indentErased(_ ids: [AnyHashable]) {
+        let typed = ids.compactMap { $0.base as? Node.ID }
+        guard !typed.isEmpty else { return }
+        onIndent(typed)
+    }
+
+    private func outdentErased(_ ids: [AnyHashable]) {
+        let typed = ids.compactMap { $0.base as? Node.ID }
+        guard !typed.isEmpty else { return }
+        onOutdent(typed)
     }
 
     private func makeSnapshot() -> TreeNodeSnapshot {
@@ -191,7 +238,8 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 disclosureCenterOffset: disclosureCenterOffset?(node, depth) ?? computedRowHeight / 2,
                 content: AnyView(rowContent(context)),
                 interactiveHitTest: { point, size in interactiveHitTest(node, point, size) },
-                children: children
+                children: children,
+                contentCount: max(0, contentCount(node))
             )
         }
         return build(root, depth: 0)

@@ -12,6 +12,10 @@ struct TreeNodeSnapshot {
     let content: AnyView
     let interactiveHitTest: (CGPoint, CGSize) -> Bool
     let children: [TreeNodeSnapshot]
+    let contentCount: Int
+
+    var subtreeNodeCount: Int { 1 + children.reduce(0) { $0 + $1.subtreeNodeCount } }
+    var subtreeContentCount: Int { contentCount + children.reduce(0) { $0 + $1.subtreeContentCount } }
 }
 
 struct TreeStructureSignature: Equatable {

@@ -7,15 +7,21 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private let scrollView = NSScrollView()
     private let outlineView = TreeOutlineView()
     private var root: TreeNodeSnapshot?
-    private var projection = TreeProjection(root: TreeNodeSnapshot(id: AnyHashable("empty"), title: "", searchableText: "", depth: 0, rowHeight: 32, disclosureCenterOffset: 16, content: AnyView(EmptyView()), interactiveHitTest: { _, _ in false }, children: []), query: "", previousItems: [:])
+    private var projection = TreeProjection(root: TreeNodeSnapshot(id: AnyHashable("empty"), title: "", searchableText: "", depth: 0, rowHeight: 32, disclosureCenterOffset: 16, content: AnyView(EmptyView()), interactiveHitTest: { _, _ in false }, children: [], contentCount: 0), query: "", previousItems: [:])
     private var searchText = ""
     private var selectedID: AnyHashable?
+    private var selectedIDs: Set<AnyHashable> = []
     private var targetExpandedIDs: Set<AnyHashable> = []
     private var canMove: (AnyHashable, AnyHashable, TreeMovePlacement) -> Bool = { _, _, _ in false }
     private var onSelect: (AnyHashable?) -> Void = { _ in }
     private var onToggleExpanded: (AnyHashable) -> Void = { _ in }
     private var onMove: (AnyHashable, AnyHashable, TreeMovePlacement) -> Void = { _, _, _ in }
     private var onCreateSibling: (AnyHashable?) -> AnyHashable? = { _ in nil }
+    private var onSelectMultiple: (Set<AnyHashable>) -> Void = { _ in }
+    private var onDelete: ([AnyHashable]) -> Void = { _ in }
+    private var onIndent: ([AnyHashable]) -> Void = { _ in }
+    private var onOutdent: ([AnyHashable]) -> Void = { _ in }
+    private var contextMenuID: AnyHashable?
     private var onRowInteraction: (AnyHashable) -> Void = { _ in }
     private var dragTokensByID: [AnyHashable: String] = [:]
     private var dragIDsByToken: [String: AnyHashable] = [:]
@@ -38,7 +44,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.dataSource = self
         outlineView.delegate = self
         outlineView.headerView = nil
-        outlineView.allowsMultipleSelection = false
+        outlineView.allowsMultipleSelection = true
         outlineView.allowsEmptySelection = true
         outlineView.selectionHighlightStyle = .regular
         outlineView.style = .sourceList
@@ -58,6 +64,9 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
+        outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
+        outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
+        outlineView.onContextMenu = { [weak self] id in self?.makeContextMenu(for: id) }
         scrollView.documentView = outlineView
         container.addSubview(scrollView)
         NSLayoutConstraint.activate([
@@ -71,6 +80,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     func update(
         root newRoot: TreeNodeSnapshot,
         selectedID newSelectedID: AnyHashable?,
+        selectedIDs newSelectedIDs: Set<AnyHashable>,
         expandedIDs newExpandedIDs: Set<AnyHashable>,
         searchText newSearchText: String,
         canMove newCanMove: @escaping (AnyHashable, AnyHashable, TreeMovePlacement) -> Bool,
@@ -78,6 +88,10 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onToggleExpanded newOnToggleExpanded: @escaping (AnyHashable) -> Void,
         onMove newOnMove: @escaping (AnyHashable, AnyHashable, TreeMovePlacement) -> Void,
         onCreateSibling newOnCreateSibling: @escaping (AnyHashable?) -> AnyHashable?,
+        onSelectMultiple newOnSelectMultiple: @escaping (Set<AnyHashable>) -> Void,
+        onDelete newOnDelete: @escaping ([AnyHashable]) -> Void,
+        onIndent newOnIndent: @escaping ([AnyHashable]) -> Void,
+        onOutdent newOnOutdent: @escaping ([AnyHashable]) -> Void,
         onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void
     ) {
         canMove = newCanMove
@@ -85,15 +99,23 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onToggleExpanded = newOnToggleExpanded
         onMove = newOnMove
         onCreateSibling = newOnCreateSibling
+        onSelectMultiple = newOnSelectMultiple
+        onDelete = newOnDelete
+        onIndent = newOnIndent
+        onOutdent = newOnOutdent
         onRowInteraction = newOnRowInteraction
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
+        outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
+        outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
+        outlineView.onContextMenu = { [weak self] id in self?.makeContextMenu(for: id) }
 
         let treeChanged = root == nil || projection.structureSignature != TreeStructureSignature(newRoot)
         let searchChanged = searchText != newSearchText
-        let selectedChanged = selectedID != newSelectedID
+        let selectedChanged = selectedID != newSelectedID || selectedIDs != newSelectedIDs
         let expansionChanged = targetExpandedIDs != newExpandedIDs
         selectedID = newSelectedID
+        selectedIDs = newSelectedIDs.isEmpty && newSelectedID != nil ? [newSelectedID!] : newSelectedIDs
         searchText = newSearchText
 
         let previousScrollOrigin = scrollView.contentView.bounds.origin
@@ -160,18 +182,89 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
     private func handleReturnKey() {
         guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let current = outlineView.selectedRow >= 0
-            ? (outlineView.item(atRow: outlineView.selectedRow) as? TreeOutlineItem)?.snapshot.id
-            : nil
+        let currentIDs = selectedItemsInTreeOrder().map { $0.snapshot.id }
+        let current = currentIDs.last
         _ = onCreateSibling(current)
     }
+
+    private func selectedItemsInTreeOrder() -> [TreeOutlineItem] {
+        (0..<outlineView.numberOfRows).compactMap { row in
+            guard outlineView.isRowSelected(row) else { return nil }
+            return outlineView.item(atRow: row) as? TreeOutlineItem
+        }
+    }
+
+    private func handleDeleteKey() {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let chosen = selectedItemsInTreeOrder().filter { $0.snapshot.id != root?.id }
+        guard !chosen.isEmpty else { return }
+        let roots = chosen.filter { item in
+            !chosen.contains { other in other.snapshot.id != item.snapshot.id && projection.isDescendant(item.snapshot.id, of: other.snapshot.id) }
+        }
+        let nodeCount = roots.reduce(0) { $0 + $1.snapshot.subtreeNodeCount }
+        let contentCount = roots.reduce(0) { $0 + $1.snapshot.subtreeContentCount }
+        if contentCount > 0 {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Delete \(nodeCount) node\(nodeCount == 1 ? "" : "s")?"
+            alert.informativeText = "This will delete \(nodeCount) node\(nodeCount == 1 ? "" : "s"), including all descendants, and permanently remove \(contentCount) content item\(contentCount == 1 ? "" : "s"). This cannot be undone."
+            alert.addButton(withTitle: "Delete")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        onDelete(roots.map { $0.snapshot.id })
+    }
+
+    private func handleIndentKey(shift: Bool) {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let ids = selectedItemsInTreeOrder().map { $0.snapshot.id }.filter { $0 != root?.id }
+        guard !ids.isEmpty else { return }
+        if shift { onOutdent(ids) } else { onIndent(ids) }
+    }
+
+    private func makeContextMenu(for id: AnyHashable) -> NSMenu? {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let item = projection.allItemsByID[id] else { return nil }
+        if !selectedIDs.contains(id) {
+            selectedIDs = [id]
+            selectedID = id
+            outlineView.selectRowIndexes(IndexSet(integer: outlineView.row(forItem: item)), byExtendingSelection: false)
+            onSelect(id)
+            onSelectMultiple([id])
+        }
+        contextMenuID = id
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Add node", action: #selector(contextAddNode), keyEquivalent: "")
+        if id != root?.id {
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Indent (Tab)", action: #selector(contextIndent), keyEquivalent: "")
+            menu.addItem(withTitle: "Outdent (Shift Tab)", action: #selector(contextOutdent), keyEquivalent: "")
+            menu.addItem(.separator())
+            menu.addItem(withTitle: selectedItemsInTreeOrder().count > 1 ? "Delete selected nodes" : "Delete this node", action: #selector(contextDelete), keyEquivalent: "")
+        }
+        for menuItem in menu.items where !menuItem.isSeparatorItem { menuItem.target = self }
+        return menu
+    }
+
+    @objc private func contextAddNode() {
+        let ids = selectedItemsInTreeOrder().map { $0.snapshot.id }
+        _ = onCreateSibling(ids.last ?? contextMenuID)
+    }
+    @objc private func contextDelete() { handleDeleteKey() }
+    @objc private func contextIndent() { handleIndentKey(shift: false) }
+    @objc private func contextOutdent() { handleIndentKey(shift: true) }
 
     private func synchronizeSelection(_ id: AnyHashable?) {
         let previous = isSynchronizingSelection
         isSynchronizingSelection = true
         defer { isSynchronizingSelection = previous }
-        guard let row = rowIndex(for: id) else { outlineView.deselectAll(nil); return }
-        if outlineView.selectedRow != row { outlineView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        guard rowIndex(for: id) != nil else { outlineView.deselectAll(nil); return }
+        let indexes = IndexSet((0..<outlineView.numberOfRows).filter { rowIndex in
+            guard let item = outlineView.item(atRow: rowIndex) as? TreeOutlineItem else { return false }
+            return selectedIDs.contains(item.snapshot.id)
+        })
+        if indexes.isEmpty { outlineView.deselectAll(nil) }
+        else if outlineView.selectedRowIndexes != indexes { outlineView.selectRowIndexes(indexes, byExtendingSelection: false) }
     }
 
     private func rowIndex(for id: AnyHashable?) -> Int? {
@@ -240,10 +333,17 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !isSynchronizingSelection else { return }
-        let row = outlineView.selectedRow
-        guard row >= 0, let item = outlineView.item(atRow: row) as? TreeOutlineItem, item.snapshot.id != selectedID else { return }
-        selectedID = item.snapshot.id
-        onSelect(item.snapshot.id)
+        let items = selectedItemsInTreeOrder()
+        let ids = Set(items.map { $0.snapshot.id })
+        selectedIDs = ids
+        onSelectMultiple(ids)
+        if let item = items.last {
+            selectedID = item.snapshot.id
+            onSelect(item.snapshot.id)
+        } else {
+            selectedID = nil
+            onSelect(nil)
+        }
     }
 
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem: Any?, proposedChildIndex index: Int) -> NSDragOperation {
@@ -281,13 +381,23 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 private final class TreeOutlineView: NSOutlineView {
     var onRowMouseDown: ((AnyHashable) -> Void)?
     var onReturn: (() -> Void)?
+    var onDeleteKey: (() -> Void)?
+    var onIndentKey: ((Bool) -> Void)?
+    var onContextMenu: ((AnyHashable) -> NSMenu?)?
 
     override func keyDown(with event: NSEvent) {
-        if (event.keyCode == 36 || event.keyCode == 76), event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
-            onReturn?()
-            return
-        }
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option])
+        if (event.keyCode == 36 || event.keyCode == 76), modifiers.isEmpty { onReturn?(); return }
+        if (event.keyCode == 51 || event.keyCode == 117), modifiers.isEmpty { onDeleteKey?(); return }
+        if event.keyCode == 48, modifiers.isEmpty { onIndentKey?(event.modifierFlags.contains(.shift)); return }
         super.keyDown(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        let row = row(at: point)
+        guard row >= 0, let item = item(atRow: row) as? TreeOutlineItem else { return super.menu(for: event) }
+        return onContextMenu?(item.snapshot.id) ?? super.menu(for: event)
     }
 
     override func frameOfOutlineCell(atRow row: Int) -> NSRect {

@@ -42,6 +42,15 @@ Keep app-specific icons, thumbnails, row metrics, and other presentation choices
 - `TreeRowContext.isEditing` lets the host render an inline editor. Call `onRename(title)` to persist the edited title and `onSubmitEditing()` on Enter to create the next sibling and continue typing.
 - Creation is disabled while search filtering is active, because the filtered projection is not a safe basis for mutation placement.
 
+## Editing and deletion
+
+- Command-click uses native multi-selection; `selectedIDs` exposes the selected set while `selection` remains the primary/last selected ID.
+- Return/Enter creates a sibling after the last selected node in tree order. With no selection, the host receives `nil` and can append a top-level node.
+- Backspace/Delete opens one confirmation only when the selected subtrees contain content. The confirmation reports the total number of nodes including descendants and the total content-item count. Selected descendants of another selected node are deduplicated; the visible Root cannot be deleted.
+- `contentCount` supplies the number of content items directly attached to each node. The component sums these values through each selected subtree before showing confirmation.
+- `onDelete` receives only the selected subtree roots to delete. `onIndent` and `onOutdent` receive selected IDs in tree order.
+- Right-click provides Add node, Delete, Indent (Tab), and Outdent (Shift Tab). Mutations and persistence remain the host's responsibility.
+
 ## Moving nodes
 
 - `canMove(sourceID, targetID, placement)` is required and must be a pure validation callback. It must not mutate or persist the model.
