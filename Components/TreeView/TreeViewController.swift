@@ -339,7 +339,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
     private func handleRowMouseDown(_ id: AnyHashable) {
         onRowInteraction(id)
-        showHierarchyHighlight(for: id)
+        showClickHighlight(for: id)
     }
 
     private func showPendingHierarchyChangeIfNeeded() {
@@ -357,27 +357,64 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private func showHierarchyHighlight(for id: AnyHashable) {
         guard let root,
               let parentID = parentID(of: id, in: root),
-              let nodeRow = rowIndex(for: id),
-              let parentRow = rowIndex(for: parentID) else { return }
+              rowIndex(for: id) != nil,
+              rowIndex(for: parentID) != nil else { return }
+        showRowGroupHighlight(for: [parentID, id])
+    }
 
-        // A new interaction replaces any in-flight highlight so one clear relationship
-        // is visible instead of several overlapping outlines.
+    private func showClickHighlight(for id: AnyHashable) {
+        guard let root,
+              let item = projection.allItemsByID[id],
+              rowIndex(for: id) != nil else { return }
+
+        var rowIDs = [id]
+        if item.allChildren.isEmpty {
+            // A leaf is best understood through its relationship with its parent.
+            if let parent = parentID(of: id, in: root), rowIndex(for: parent) != nil {
+                rowIDs.append(parent)
+            }
+        } else {
+            // A node with descendants gets one enclosing outline around its visible
+            // subtree. Hidden descendants stay hidden; clicking never expands the tree.
+            func appendVisibleDescendants(of parent: TreeOutlineItem) {
+                for child in parent.allChildren {
+                    if rowIndex(for: child.snapshot.id) != nil {
+                        rowIDs.append(child.snapshot.id)
+                        appendVisibleDescendants(of: child)
+                    }
+                }
+            }
+            appendVisibleDescendants(of: item)
+        }
+        showRowGroupHighlight(for: rowIDs)
+    }
+
+    private func showRowGroupHighlight(for rowIDs: [AnyHashable]) {
+        // A new interaction replaces any in-flight highlight so one clear region
+        // remains visible instead of multiple nested or overlapping outlines.
         outlineView.subviews
             .compactMap { $0 as? TreeHierarchyChangeOverlay }
             .forEach { $0.removeFromSuperview() }
 
-        let nodeRowRect = outlineView.rect(ofRow: nodeRow)
-        let parentRowRect = outlineView.rect(ofRow: parentRow)
-        guard !nodeRowRect.isEmpty, !parentRowRect.isEmpty else { return }
+        let rowRects = rowIDs.compactMap { id -> NSRect? in
+            guard let row = rowIndex(for: id) else { return nil }
+            let rect = outlineView.rect(ofRow: row)
+            return rect.isEmpty ? nil : rect
+        }
+        guard !rowRects.isEmpty else { return }
 
         let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
         overlay.autoresizingMask = [.width, .height]
         outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
 
-        // Draw around the actual parent and node row positions, in the overlay's space.
-        let nodeRect = overlay.convert(nodeRowRect, from: outlineView)
-        let parentRect = overlay.convert(parentRowRect, from: outlineView)
-        overlay.highlightRect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
+        // Union actual row rectangles after converting them to overlay coordinates.
+        let convertedRects = rowRects.map { overlay.convert($0, from: outlineView) }
+        guard let firstRect = convertedRects.first else {
+            overlay.removeFromSuperview()
+            return
+        }
+        let combinedRect = convertedRects.dropFirst().reduce(firstRect) { NSUnionRect($0, $1) }
+        overlay.highlightRect = combinedRect.insetBy(dx: 3, dy: 2)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
             guard let overlay else { return }
