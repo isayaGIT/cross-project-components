@@ -23,6 +23,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var onOutdent: ([AnyHashable]) -> Void = { _ in }
     private var contextMenuID: AnyHashable?
     private var onRowInteraction: (AnyHashable) -> Void = { _ in }
+    private var onBeginEditing: (AnyHashable) -> Void = { _ in }
     private var dragTokensByID: [AnyHashable: String] = [:]
     private var dragIDsByToken: [String: AnyHashable] = [:]
     private var isSynchronizingSelection = false
@@ -63,6 +64,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.outlineTableColumn = column
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
         outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
@@ -92,7 +94,8 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onDelete newOnDelete: @escaping ([AnyHashable]) -> Void,
         onIndent newOnIndent: @escaping ([AnyHashable]) -> Void,
         onOutdent newOnOutdent: @escaping ([AnyHashable]) -> Void,
-        onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void
+        onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void,
+        onBeginEditing newOnBeginEditing: @escaping (AnyHashable) -> Void
     ) {
         canMove = newCanMove
         onSelect = newOnSelect
@@ -104,7 +107,9 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onIndent = newOnIndent
         onOutdent = newOnOutdent
         onRowInteraction = newOnRowInteraction
+        onBeginEditing = newOnBeginEditing
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
         outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
@@ -385,6 +390,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
 private final class TreeOutlineView: NSOutlineView {
     var onRowMouseDown: ((AnyHashable) -> Void)?
+    var onDoubleClick: ((AnyHashable) -> Void)?
     var onReturn: (() -> Void)?
     var onDeleteKey: (() -> Void)?
     var onIndentKey: ((Bool) -> Void)?
@@ -420,7 +426,10 @@ private final class TreeOutlineView: NSOutlineView {
         let row = row(at: point)
         let id = row >= 0 ? (item(atRow: row) as? TreeOutlineItem)?.snapshot.id : nil
         super.mouseDown(with: event)
-        if let id { onRowMouseDown?(id) }
+        if let id {
+            onRowMouseDown?(id)
+            if event.clickCount == 2 { onDoubleClick?(id) }
+        }
     }
 }
 

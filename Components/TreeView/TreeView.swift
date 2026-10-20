@@ -27,9 +27,9 @@ public struct TreeRowContext<Node> {
     public let hasChildren: Bool
     public let isEditing: Bool
     public let onRename: (String) -> Void
-    public let onSubmitEditing: () -> Void
+    public let onCommitEditing: (String) -> Void
 
-    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onSubmitEditing: @escaping () -> Void = {}) {
+    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onCommitEditing: @escaping (String) -> Void = { _ in }) {
         self.node = node
         self.depth = depth
         self.isSelected = isSelected
@@ -37,7 +37,7 @@ public struct TreeRowContext<Node> {
         self.hasChildren = hasChildren
         self.isEditing = isEditing
         self.onRename = onRename
-        self.onSubmitEditing = onSubmitEditing
+        self.onCommitEditing = onCommitEditing
     }
 }
 
@@ -50,6 +50,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     @Binding private var expandedIDs: Set<Node.ID>
     @Binding private var editingID: Node.ID?
     @Binding private var selectedIDs: Set<Node.ID>
+    @State private var pendingCreatedIDs: Set<Node.ID> = []
     public let searchText: String
     private let searchableText: (Node) -> String
     private let rowHeight: (Node, Int) -> CGFloat
@@ -131,6 +132,12 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
+            },
+            onBeginEditing: { id in
+                guard let typedID = id.base as? Node.ID else { return }
+                self.selection = typedID
+                self.selectedIDs = [typedID]
+                self.editingID = typedID
             }
         )
         return controller
@@ -156,6 +163,12 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
+            },
+            onBeginEditing: { id in
+                guard let typedID = id.base as? Node.ID else { return }
+                self.selection = typedID
+                self.selectedIDs = [typedID]
+                self.editingID = typedID
             }
         )
     }
@@ -183,6 +196,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         guard let newID = onCreateSibling(typedID) else { return nil }
         selection = newID
         selectedIDs = [newID]
+        pendingCreatedIDs.insert(newID)
         editingID = newID
         return AnyHashable(newID)
     }
@@ -227,7 +241,21 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 hasChildren: hasChildren,
                 isEditing: node.treeID == editingID,
                 onRename: { title in onRename(node.treeID, title) },
-                onSubmitEditing: { _ = createSiblingErased(node.treeID) }
+                onCommitEditing: { title in
+                    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        if pendingCreatedIDs.contains(node.treeID) {
+                            pendingCreatedIDs.remove(node.treeID)
+                            onDelete([node.treeID])
+                            selection = nil
+                            selectedIDs = []
+                        }
+                    } else {
+                        onRename(node.treeID, trimmed)
+                        pendingCreatedIDs.remove(node.treeID)
+                    }
+                    if editingID == node.treeID { editingID = nil }
+                }
             )
             return TreeNodeSnapshot(
                 id: AnyHashable(node.treeID),
