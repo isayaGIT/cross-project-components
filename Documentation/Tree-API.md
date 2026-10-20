@@ -1,0 +1,48 @@
+# TreeView API contract
+
+`TreeView<Node, RowContent>` is a reusable native macOS hierarchy component. The public SwiftUI-facing view is backed by AppKit's `NSOutlineView`.
+
+## Ownership boundary
+
+The component owns outline mechanics, stable native row wrappers, controlled expansion and selection synchronization, ancestor-preserving search, search-only expansion, row hit testing, and drag/drop proposal handling.
+
+The host owns its domain model, persistence, mutations, move rules, row content, and application-specific visual treatment. The package does not depend on any consuming application's model or storage layer.
+
+## Model contract
+
+A host type conforms to `TreeNodeRepresentable`:
+
+- `treeID` must be stable and unique within the tree.
+- `treeTitle` is the default displayed title.
+- `treeChildren` returns the node's children.
+
+The supplied `root` is rendered as the visible root row. The component rebuilds a presentation snapshot from the current root during SwiftUI updates; keep IDs stable when updating the model.
+
+## State and search
+
+- `selection: Binding<Node.ID?>` is the selected node ID, or `nil`.
+- `expandedIDs: Binding<Set<Node.ID>>` is the host's source of truth for saved expansion state.
+- `searchText` filters by `searchableText`, which defaults to `treeTitle`.
+- Search keeps each matching node and its ancestors visible. It expands the filtered path temporarily and does not write those temporary expansions into `expandedIDs`.
+- Clear the query to restore the host-controlled expansion state.
+
+## Row content and layout
+
+- `rowContent` receives a `TreeRowContext` with the node, hierarchy depth, selected/expanded flags, and child presence.
+- `rowHeight` returns the height for each node and depth; it defaults to 32 points.
+- `disclosureCenterOffset` optionally positions the native disclosure control relative to the top of the row. By default it is centered.
+- `interactiveHitTest` can reserve specific points in a row for embedded SwiftUI interactions (for example, an image scrubber). Points not reserved by this closure continue to use native row selection.
+
+Keep app-specific icons, thumbnails, row metrics, and other presentation choices in the host's row builder rather than in this package.
+
+## Moving nodes
+
+- `canMove(sourceID, targetID, placement)` is required and must be a pure validation callback. It must not mutate or persist the model.
+- `onMove(sourceID, targetID, placement)` is called for an accepted drop; the host must perform the mutation and publish the updated root.
+- `TreeMovePlacement` is package-owned and has `inside`, `before`, and `after` cases.
+- The root cannot be dragged. A node cannot target itself or one of its descendants. Reordering is disabled while a search query is active.
+- The host must additionally validate its own domain constraints, including any application-specific rules not represented by the generic tree hierarchy.
+
+## Verification
+
+The package tests cover filtered projections, ancestor retention, stable wrapper identity, search expansion restoration, drop placement and cycle prevention. Native controller tests exercise the actual `NSOutlineView` hierarchy, visible row counts, selection callbacks, expansion, and custom row heights.
