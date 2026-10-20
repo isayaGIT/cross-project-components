@@ -18,6 +18,41 @@ public enum TreeMovePlacement: Equatable, Sendable {
     case after
 }
 
+/// Pointer gesture family considered by the TreeView gesture-layer resolver.
+public enum TreeGestureKind: Equatable, Sendable {
+    case primaryPointer
+    case secondaryPointer
+    case otherPointer
+}
+
+/// Immutable, host-independent context used to decide which gesture layer owns a pointer sequence.
+/// `point` uses top-leading row-content coordinates, matching the row layout API.
+public struct TreeGestureHitTestContext {
+    public let nodeID: AnyHashable
+    public let point: CGPoint
+    public let size: CGSize
+    public let kind: TreeGestureKind
+    public let clickCount: Int
+    public let modifierFlags: UInt
+
+    public init(nodeID: AnyHashable, point: CGPoint, size: CGSize, kind: TreeGestureKind, clickCount: Int = 1, modifierFlags: UInt = 0) {
+        self.nodeID = nodeID
+        self.point = point
+        self.size = size
+        self.kind = kind
+        self.clickCount = clickCount
+        self.modifierFlags = modifierFlags
+    }
+}
+
+/// A host-defined gesture layer. Higher priorities are resolved first; registration order breaks ties.
+/// Claiming a pointer sequence routes it to the embedded row view and prevents native Tree gestures
+/// from interpreting the same input as selection, dragging, or node editing.
+public protocol TreeGestureLayer {
+    var priority: Int { get }
+    func claims(_ context: TreeGestureHitTestContext) -> Bool
+}
+
 /// State supplied to a host-defined row renderer.
 public struct TreeRowContext<Node> {
     public let node: Node
@@ -90,6 +125,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     private let onRedo: () -> Void
     private let onRowInteraction: (Node.ID) -> Void
     private let interactiveHitTest: (Node, CGPoint, CGSize) -> Bool
+    private let gestureLayers: [any TreeGestureLayer]
     private let rowContent: (TreeRowContext<Node>) -> RowContent
 
     public init(
@@ -117,6 +153,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         onRedo: @escaping () -> Void = {},
         onRowInteraction: @escaping (Node.ID) -> Void = { _ in },
         interactiveHitTest: @escaping (Node, CGPoint, CGSize) -> Bool = { _, _, _ in false },
+        gestureLayers: [any TreeGestureLayer] = [],
         @ViewBuilder rowContent: @escaping (TreeRowContext<Node>) -> RowContent
     ) {
         self.root = root
@@ -143,6 +180,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self.onRedo = onRedo
         self.onRowInteraction = onRowInteraction
         self.interactiveHitTest = interactiveHitTest
+        self.gestureLayers = gestureLayers
         self.rowContent = rowContent
     }
 
@@ -337,6 +375,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 disclosureCenterOffset: disclosureCenterOffset?(node, depth) ?? computedRowHeight / 2,
                 content: AnyView(rowContent(context)),
                 interactiveHitTest: { point, size in interactiveHitTest(node, point, size) },
+                gestureLayers: gestureLayers,
                 children: children,
                 contentCount: max(0, contentCount(node))
             )

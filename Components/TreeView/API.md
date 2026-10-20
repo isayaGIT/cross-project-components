@@ -31,7 +31,9 @@ The supplied `root` is rendered as the visible root row. The component rebuilds 
 - `rowContent` receives a `TreeRowContext` with the node, hierarchy depth, selected/expanded flags, and child presence.
 - `rowHeight` returns the height for each node and depth; it defaults to 32 points.
 - `disclosureCenterOffset` optionally positions the native disclosure control relative to the top of the row. By default it is centered.
-- `interactiveHitTest` reserves points for embedded SwiftUI interactions (for example, an image filmstrip). It receives a point in **top-leading row-content coordinates** and the row-content size. A hit in the reserved region is routed to the embedded control rather than native row selection or drag initiation; points outside it continue to use native tree interactions.
+- `gestureLayers` optionally registers host-defined `TreeGestureLayer` implementations. Each layer declares an integer `priority` and claims hit contexts using `claims(_:)`; higher priorities are evaluated first, with registration order breaking ties. `TreeGestureHitTestContext` includes the node ID, pointer family, click count, modifier flags, and a point in **top-leading row-content coordinates** plus the row-content size. A claimed hit is routed to the embedded row control before native row selection, drag initiation, or node editing can respond. The native hosting view owns the pointer sequence after it receives the initial event.
+- `interactiveHitTest` remains source-compatible as a legacy embedded-control layer below explicitly registered `gestureLayers`. Existing hosts can migrate one interaction at a time.
+- Keep host-specific hit geometry in the host app; keep gesture ordering and event arbitration in the shared component.
 
 Keep app-specific icons, thumbnails, row metrics, and other presentation choices in the host's row builder rather than in this package.
 

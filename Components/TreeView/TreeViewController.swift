@@ -7,7 +7,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private let scrollView = NSScrollView()
     private let outlineView = TreeOutlineView()
     private var root: TreeNodeSnapshot?
-    private var projection = TreeProjection(root: TreeNodeSnapshot(id: AnyHashable("empty"), title: "", searchableText: "", depth: 0, rowHeight: 32, disclosureCenterOffset: 16, content: AnyView(EmptyView()), interactiveHitTest: { _, _ in false }, children: [], contentCount: 0), query: "", previousItems: [:])
+    private var projection = TreeProjection(root: TreeNodeSnapshot(id: AnyHashable("empty"), title: "", searchableText: "", depth: 0, rowHeight: 32, disclosureCenterOffset: 16, content: AnyView(EmptyView()), interactiveHitTest: { _, _ in false }, gestureLayers: [], children: [], contentCount: 0), query: "", previousItems: [:])
     private var searchText = ""
     private var selectedID: AnyHashable?
     private var selectedIDs: Set<AnyHashable> = []
@@ -87,6 +87,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.outlineTableColumn = column
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
         outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
+        outlineView.onEmbeddedGestureHit = { [weak self] event in self?.embeddedGestureClaims(event) ?? false }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -145,6 +146,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onBeginEditing = newOnBeginEditing
         installInputMonitors()
         outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
+        outlineView.onEmbeddedGestureHit = { [weak self] event in self?.embeddedGestureClaims(event) ?? false }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -351,6 +353,17 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             if let found = parentID(of: targetID, in: child, parent: node.id) { return found }
         }
         return nil
+    }
+
+    private func embeddedGestureClaims(_ event: NSEvent) -> Bool {
+        guard event.window === outlineView.window else { return false }
+        let pointInOutline = outlineView.convert(event.locationInWindow, from: nil)
+        let row = outlineView.row(at: pointInOutline)
+        guard row >= 0,
+              outlineView.item(atRow: row) is TreeOutlineItem,
+              let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? TreeOutlineCellView else { return false }
+        let pointInCell = cell.convert(event.locationInWindow, from: nil)
+        return cell.claimsEmbeddedGesture(at: pointInCell, event: event)
     }
 
     private func handleRowMouseDown(_ id: AnyHashable) {
@@ -626,6 +639,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
 private final class TreeOutlineView: NSOutlineView {
     var onRowMouseDown: ((AnyHashable) -> Void)?
+    var onEmbeddedGestureHit: ((NSEvent) -> Bool)?
     var onDoubleClick: ((AnyHashable) -> Void)?
     var onReturn: (() -> Void)?
     var onDeleteKey: (() -> Void)?
@@ -684,6 +698,10 @@ private final class TreeOutlineView: NSOutlineView {
         let point = convert(event.locationInWindow, from: nil)
         let row = row(at: point)
         let id = row >= 0 ? (item(atRow: row) as? TreeOutlineItem)?.snapshot.id : nil
+        // Resolve embedded layers before AppKit's native selection/drag path or node double-click.
+        // The cell hit-test normally routes directly to the hosted control; this guard ensures a
+        // claimed sequence can never leak into Tree actions if AppKit targets the outline instead.
+        if onEmbeddedGestureHit?(event) == true { return }
         super.mouseDown(with: event)
         if let id {
             onRowMouseDown?(id)
@@ -732,7 +750,35 @@ private final class TreeOutlineRowView: NSTableRowView {
 
 private final class TreeOutlineCellView: NSView {
     private var host: NSHostingView<AnyView>?
-    private var interactiveHitTest: ((CGPoint, CGSize) -> Bool)?
+    private var snapshot: TreeNodeSnapshot?
+
+    var hostSize: CGSize { host?.bounds.size ?? .zero }
+
+    func convertToTopLeadingHostPoint(_ pointInCell: CGPoint) -> CGPoint {
+        guard let host else { return .zero }
+        let point = host.convert(pointInCell, from: self)
+        let size = host.bounds.size
+        return CGPoint(x: point.x, y: host.isFlipped ? point.y : size.height - point.y)
+    }
+
+    func claimsEmbeddedGesture(at pointInCell: CGPoint, event: NSEvent? = NSApp.currentEvent) -> Bool {
+        guard let snapshot else { return false }
+        let kind: TreeGestureKind
+        switch event?.type {
+        case .rightMouseDown, .rightMouseDragged, .rightMouseUp: kind = .secondaryPointer
+        case .otherMouseDown, .otherMouseDragged, .otherMouseUp: kind = .otherPointer
+        default: kind = .primaryPointer
+        }
+        let context = TreeGestureHitTestContext(
+            nodeID: snapshot.id,
+            point: convertToTopLeadingHostPoint(pointInCell),
+            size: hostSize,
+            kind: kind,
+            clickCount: event?.clickCount ?? 1,
+            modifierFlags: event?.modifierFlags.rawValue ?? 0
+        )
+        return snapshot.claimsEmbeddedGesture(context)
+    }
 
     func configure(item: TreeOutlineItem) {
         subviews.forEach { $0.removeFromSuperview() }
@@ -741,7 +787,7 @@ private final class TreeOutlineCellView: NSView {
         host.wantsLayer = true
         host.layer?.backgroundColor = NSColor.clear.cgColor
         self.host = host
-        interactiveHitTest = item.snapshot.interactiveHitTest
+        self.snapshot = item.snapshot
         addSubview(host)
         NSLayoutConstraint.activate([
             host.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -757,15 +803,9 @@ private final class TreeOutlineCellView: NSView {
         // a point in the row view; the latter shifts the reserved region by the cell frame.
         guard let host else { return nil }
         let pointInHost = host.convert(point, from: self)
-        let hostSize = host.bounds.size
 
-        // The public hit-test contract uses SwiftUI-style, top-leading coordinates.
-        // Normalize explicitly so a host view's AppKit flippedness cannot move the hit area.
-        let topLeadingPoint = CGPoint(
-            x: pointInHost.x,
-            y: host.isFlipped ? pointInHost.y : hostSize.height - pointInHost.y
-        )
-        guard interactiveHitTest?(topLeadingPoint, hostSize) == true else { return nil }
+        // One resolver defines both hosted-control hit testing and native-event arbitration.
+        guard claimsEmbeddedGesture(at: point) else { return nil }
         return host.hitTest(pointInHost) ?? host
     }
 }

@@ -11,6 +11,17 @@ struct TreeNodeSnapshot {
     let disclosureCenterOffset: CGFloat
     let content: AnyView
     let interactiveHitTest: (CGPoint, CGSize) -> Bool
+    let gestureLayers: [any TreeGestureLayer]
+
+    func claimsEmbeddedGesture(_ context: TreeGestureHitTestContext) -> Bool {
+        for layer in gestureLayers.enumerated().sorted(by: {
+            $0.element.priority == $1.element.priority ? $0.offset < $1.offset : $0.element.priority > $1.element.priority
+        }).map(\.element) where layer.claims(context) {
+            return true
+        }
+        return interactiveHitTest(context.point, context.size)
+    }
+
     let children: [TreeNodeSnapshot]
     let contentCount: Int
 
