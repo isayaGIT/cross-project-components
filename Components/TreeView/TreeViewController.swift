@@ -239,7 +239,23 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         }
         if keyDownMonitor == nil {
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.onPointerInteraction(nil)
+                guard let self else { return event }
+
+                // While an inline NSTextField is editing, Tab normally moves focus away
+                // from the editor. That triggers the empty-new-node cleanup before the
+                // tree can apply its hierarchy shortcut. Consume Tab/Shift+Tab here and
+                // route it to the tree so the node remains in editing state.
+                let modifiers = event.modifierFlags.intersection([.command, .control, .option])
+                let isIndentKey = event.keyCode == 48 && modifiers.isEmpty
+                let isShift = event.modifierFlags.contains(.shift)
+                let isFieldEditor = event.window?.firstResponder is NSTextView
+                    && (event.window?.firstResponder as? NSTextView)?.delegate is NSTextField
+                if isIndentKey, isFieldEditor, event.window === self.outlineView.window {
+                    self.handleIndentKey(shift: isShift)
+                    return nil
+                }
+
+                self.onPointerInteraction(nil)
                 return event
             }
         }
