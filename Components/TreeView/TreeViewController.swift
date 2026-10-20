@@ -18,7 +18,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var onMove: (AnyHashable, AnyHashable, TreeMovePlacement) -> Void = { _, _, _ in }
     private var onCreateSibling: (AnyHashable?) -> AnyHashable? = { _ in nil }
     private var onSelectMultiple: (Set<AnyHashable>) -> Void = { _ in }
-    private var onDelete: ([AnyHashable]) -> Void = { _ in }
+    private var onDelete: ([AnyHashable], AnyHashable?) -> Void = { _, _ in }
     private var onIndent: ([AnyHashable]) -> Void = { _ in }
     private var onOutdent: ([AnyHashable]) -> Void = { _ in }
     private var canUndo = false
@@ -97,7 +97,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onMove newOnMove: @escaping (AnyHashable, AnyHashable, TreeMovePlacement) -> Void,
         onCreateSibling newOnCreateSibling: @escaping (AnyHashable?) -> AnyHashable?,
         onSelectMultiple newOnSelectMultiple: @escaping (Set<AnyHashable>) -> Void,
-        onDelete newOnDelete: @escaping ([AnyHashable]) -> Void,
+        onDelete newOnDelete: @escaping ([AnyHashable], AnyHashable?) -> Void,
         onIndent newOnIndent: @escaping ([AnyHashable]) -> Void,
         onOutdent newOnOutdent: @escaping ([AnyHashable]) -> Void,
         canUndo newCanUndo: Bool,
@@ -238,7 +238,13 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        onDelete(roots.map { $0.snapshot.id })
+        let firstSelectedRow = chosen.compactMap { outlineView.row(forItem: $0) }.filter { $0 >= 0 }.min()
+        let previousVisibleID: AnyHashable? = firstSelectedRow.flatMap { firstRow in
+            guard firstRow > 0,
+                  let previousItem = outlineView.item(atRow: firstRow - 1) as? TreeOutlineItem else { return nil }
+            return previousItem.snapshot.id
+        }
+        onDelete(roots.map { $0.snapshot.id }, previousVisibleID)
     }
 
     private func handleIndentKey(shift: Bool) {

@@ -61,6 +61,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     private let onRename: (Node.ID, String) -> Void
     private let contentCount: (Node) -> Int
     private let onDelete: ([Node.ID]) -> Void
+    private let onDeleteWithSelection: (([Node.ID], Node.ID?) -> Void)?
     private let onIndent: ([Node.ID]) -> Void
     private let onOutdent: ([Node.ID]) -> Void
     private let canUndo: Bool
@@ -87,6 +88,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         onRename: @escaping (Node.ID, String) -> Void = { _, _ in },
         contentCount: @escaping (Node) -> Int = { _ in 0 },
         onDelete: @escaping ([Node.ID]) -> Void = { _ in },
+        onDeleteWithSelection: (([Node.ID], Node.ID?) -> Void)? = nil,
         onIndent: @escaping ([Node.ID]) -> Void = { _ in },
         onOutdent: @escaping ([Node.ID]) -> Void = { _ in },
         canUndo: Bool = false,
@@ -112,6 +114,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self.onRename = onRename
         self.contentCount = contentCount
         self.onDelete = onDelete
+        self.onDeleteWithSelection = onDeleteWithSelection
         self.onIndent = onIndent
         self.onOutdent = onOutdent
         self.canUndo = canUndo
@@ -222,13 +225,35 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         return AnyHashable(newID)
     }
 
-    private func deleteErased(_ ids: [AnyHashable]) {
+    private func deleteErased(_ ids: [AnyHashable], preferredSelection: AnyHashable?) {
         let typed = ids.compactMap { $0.base as? Node.ID }
         guard !typed.isEmpty else { return }
-        onDelete(typed)
-        selection = nil
-        selectedIDs = []
+        let fallbackID = preferredSelection?.base as? Node.ID
+        if let onDeleteWithSelection {
+            onDeleteWithSelection(typed, fallbackID)
+        } else {
+            onDelete(typed)
+        }
+        if let fallbackID {
+            selection = fallbackID
+            selectedIDs = [fallbackID]
+        } else {
+            selection = nil
+            selectedIDs = []
+        }
         editingID = nil
+    }
+
+    private func previousVisibleID(before targetID: Node.ID) -> Node.ID? {
+        var visibleIDs: [Node.ID] = []
+        func appendVisible(_ node: Node) {
+            visibleIDs.append(node.treeID)
+            guard expandedIDs.contains(node.treeID) else { return }
+            for child in node.treeChildren { appendVisible(child) }
+        }
+        appendVisible(root)
+        guard let index = visibleIDs.firstIndex(of: targetID), index > 0 else { return nil }
+        return visibleIDs[index - 1]
     }
 
     private func indentErased(_ ids: [AnyHashable]) {
@@ -265,7 +290,8 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 onCommitEditing: { title in
                     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
                     if trimmed.isEmpty {
-                        if let previousID = pendingCreatedPreviousIDs.removeValue(forKey: node.treeID) {
+                        if let originalPreviousID = pendingCreatedPreviousIDs.removeValue(forKey: node.treeID) {
+                            let previousID = previousVisibleID(before: node.treeID) ?? originalPreviousID
                             onDelete([node.treeID])
                             selection = previousID
                             selectedIDs = [previousID]
