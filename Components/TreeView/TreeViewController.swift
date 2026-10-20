@@ -37,7 +37,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var isSynchronizingSelection = false
     private var isSynchronizingExpansion = false
     private var hasCompletedInitialConfiguration = false
-    private var pendingHierarchyChange: (oldParentByID: [AnyHashable: AnyHashable?], nodeIDs: [AnyHashable], anchorBottomByID: [AnyHashable: CGFloat])?
+    private var pendingHierarchyChange: (oldParentByID: [AnyHashable: AnyHashable?], nodeIDs: [AnyHashable])?
 
     deinit {
         removeInputMonitors()
@@ -324,13 +324,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         guard !ids.isEmpty, let root else { return }
         pendingHierarchyChange = (
             oldParentByID: Dictionary(uniqueKeysWithValues: ids.map { ($0, parentID(of: $0, in: root)) }),
-            nodeIDs: ids,
-            // Keep the lower edge anchored to the moved row's pre-change position.
-            // Only the upper edge should move as the direct parent changes.
-            anchorBottomByID: Dictionary(uniqueKeysWithValues: ids.compactMap { id in
-                guard let row = rowIndex(for: id) else { return nil }
-                return (id, outlineView.rect(ofRow: row).maxY)
-            })
+            nodeIDs: ids
         )
         if shift { onOutdent(ids) } else { onIndent(ids) }
     }
@@ -351,22 +345,31 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             let oldParent = pending.oldParentByID[id] ?? nil
             guard let newParent = parentID(of: id, in: root), oldParent != newParent,
                   let nodeRow = rowIndex(for: id), let parentRow = rowIndex(for: newParent) else { continue }
-            let nodeRect = outlineView.rect(ofRow: nodeRow)
-            let parentRect = outlineView.rect(ofRow: parentRow)
-            guard !nodeRect.isEmpty, !parentRect.isEmpty else { continue }
-            let top = min(parentRect.minY, nodeRect.minY)
-            let anchoredBottom = pending.anchorBottomByID[id] ?? nodeRect.maxY
-            let bottom = max(top + 6, anchoredBottom)
-            let rect = NSRect(
-                x: min(parentRect.minX, nodeRect.minX) + 3,
-                y: top + 2,
-                width: max(parentRect.maxX, nodeRect.maxX) - min(parentRect.minX, nodeRect.minX) - 6,
-                height: bottom - top - 4
-            )
+            // Read both row positions after the hierarchy update. These rects are in
+            // outlineView coordinates; convert them to the overlay's own coordinates
+            // before drawing so the highlight follows row positions, not window size.
+            let nodeRowRect = outlineView.rect(ofRow: nodeRow)
+            let parentRowRect = outlineView.rect(ofRow: parentRow)
+            guard !nodeRowRect.isEmpty, !parentRowRect.isEmpty else { continue }
+
             let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
-            overlay.highlightRect = rect
             overlay.autoresizingMask = [.width, .height]
             outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
+
+            let nodeRect = overlay.convert(nodeRowRect, from: outlineView)
+            let parentRect = overlay.convert(parentRowRect, from: outlineView)
+            // The top edge is the parent's visual top; the bottom edge is the
+            // currently operated node's visual bottom. AppKit's flipped coordinate
+            // systems are handled explicitly rather than caching pre-move geometry.
+            let topEdge = overlay.isFlipped ? parentRect.minY : parentRect.maxY
+            let bottomEdge = overlay.isFlipped ? nodeRect.maxY : nodeRect.minY
+            let rect = NSRect(
+                x: min(parentRect.minX, nodeRect.minX) + 3,
+                y: min(topEdge, bottomEdge) + 2,
+                width: max(1, max(parentRect.maxX, nodeRect.maxX) - min(parentRect.minX, nodeRect.minX) - 6),
+                height: max(6, abs(bottomEdge - topEdge) - 4)
+            )
+            overlay.highlightRect = rect
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
                 guard let overlay else { return }
                 NSAnimationContext.runAnimationGroup { context in
