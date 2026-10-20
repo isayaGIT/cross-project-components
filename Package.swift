@@ -11,7 +11,7 @@ let package = Package(
         .target(
             name: "CrossProjectComponents",
             path: "Components",
-            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif"]
+            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif", "MessageComposer/demo.gif", "SwipeBack/demo.gif"]
         )
     ]
 )
