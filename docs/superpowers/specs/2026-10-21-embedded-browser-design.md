@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed design — awaiting user review before implementation.
+Approved by the user on 2026-10-21; implementation and package build verification complete.
 
 ## Goal
 
@@ -20,7 +20,7 @@ Provide a public SwiftUI `EmbeddedBrowserView` with:
 
 - An initial URL and an explicit way for the host to request navigation to a new URL after presentation.
 - A small `EmbeddedBrowserConfiguration` value controlling visible toolbar elements and whether the address field is shown.
-- Optional URL/loading callbacks so the host can reflect navigation state without reaching into `WKWebView` internals.
+- Optional URL/loading callbacks and a navigation-failure callback so the host can reflect navigation state without reaching into `WKWebView` internals.
 - A navigation policy callback for links or schemes the component should not silently handle.
 
 The component should expose the common browsing actions only: back, forward, reload, load progress, and optionally a URL field. It should not implement bookmarks, browser tabs, extensions, history management, downloads UI, or a custom cookie manager in the first version.
