@@ -31,7 +31,7 @@ The supplied `root` is rendered as the visible root row. The component rebuilds 
 - `rowContent` receives a `TreeRowContext` with the node, hierarchy depth, selected/expanded flags, and child presence.
 - `rowHeight` returns the height for each node and depth; it defaults to 32 points.
 - `disclosureCenterOffset` optionally positions the native disclosure control relative to the top of the row. By default it is centered.
-- `interactiveHitTest` can reserve specific points in a row for embedded SwiftUI interactions (for example, an image scrubber). Points not reserved by this closure continue to use native row selection.
+- `interactiveHitTest` reserves points for embedded SwiftUI interactions (for example, an image filmstrip). It receives a point in **top-leading row-content coordinates** and the row-content size. A hit in the reserved region is routed to the embedded control rather than native row selection or drag initiation; points outside it continue to use native tree interactions.
 
 Keep app-specific icons, thumbnails, row metrics, and other presentation choices in the host's row builder rather than in this package.
 

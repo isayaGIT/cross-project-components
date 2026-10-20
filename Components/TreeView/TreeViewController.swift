@@ -736,8 +736,20 @@ private final class TreeOutlineCellView: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let pointInCell = convert(point, from: superview)
-        guard let host, interactiveHitTest?(CGPoint(x: pointInCell.x, y: pointInCell.y), bounds.size) == true else { return nil }
-        return host.hitTest(pointInCell) ?? host
+        // NSView.hitTest(_:) already supplies a point in this cell's coordinate space.
+        // Convert that local point into the hosting view instead of interpreting it as
+        // a point in the row view; the latter shifts the reserved region by the cell frame.
+        guard let host else { return nil }
+        let pointInHost = host.convert(point, from: self)
+        let hostSize = host.bounds.size
+
+        // The public hit-test contract uses SwiftUI-style, top-leading coordinates.
+        // Normalize explicitly so a host view's AppKit flippedness cannot move the hit area.
+        let topLeadingPoint = CGPoint(
+            x: pointInHost.x,
+            y: host.isFlipped ? pointInHost.y : hostSize.height - pointInHost.y
+        )
+        guard interactiveHitTest?(topLeadingPoint, hostSize) == true else { return nil }
+        return host.hitTest(pointInHost) ?? host
     }
 }
