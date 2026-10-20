@@ -86,7 +86,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.addTableColumn(column)
         outlineView.outlineTableColumn = column
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
-        outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -144,7 +144,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onPointerInteraction = newOnPointerInteraction
         onBeginEditing = newOnBeginEditing
         installInputMonitors()
-        outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
+        outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -337,40 +337,57 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         return nil
     }
 
+    private func handleRowMouseDown(_ id: AnyHashable) {
+        onRowInteraction(id)
+        showHierarchyHighlight(for: id)
+    }
+
     private func showPendingHierarchyChangeIfNeeded() {
         guard let pending = pendingHierarchyChange else { return }
         pendingHierarchyChange = nil
         guard let root else { return }
         for id in pending.nodeIDs {
             let oldParent = pending.oldParentByID[id] ?? nil
-            guard let newParent = parentID(of: id, in: root), oldParent != newParent,
-                  let nodeRow = rowIndex(for: id), let parentRow = rowIndex(for: newParent) else { continue }
-            // Read row geometry after the hierarchy update, never from the old tree.
-            let nodeRowRect = outlineView.rect(ofRow: nodeRow)
-            let parentRowRect = outlineView.rect(ofRow: parentRow)
-            guard !nodeRowRect.isEmpty, !parentRowRect.isEmpty else { continue }
-
-            let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
-            overlay.autoresizingMask = [.width, .height]
-            outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
-
-            // Convert both complete row rects into the overlay's coordinate space,
-            // then enclose their union. Do not manually choose minY/maxY as "top"
-            // or "bottom": AppKit's Y direction depends on whether a view is flipped.
-            let nodeRect = overlay.convert(nodeRowRect, from: outlineView)
-            let parentRect = overlay.convert(parentRowRect, from: outlineView)
-            overlay.highlightRect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
-                guard let overlay else { return }
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.62
-                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    overlay.animator().alphaValue = 0
-                } completionHandler: {
-                    overlay.removeFromSuperview()
-                }
-            }
+            guard let newParent = parentID(of: id, in: root), oldParent != newParent else { continue }
+            showHierarchyHighlight(for: id)
             return
+        }
+    }
+
+    private func showHierarchyHighlight(for id: AnyHashable) {
+        guard let root,
+              let parentID = parentID(of: id, in: root),
+              let nodeRow = rowIndex(for: id),
+              let parentRow = rowIndex(for: parentID) else { return }
+
+        // A new interaction replaces any in-flight highlight so one clear relationship
+        // is visible instead of several overlapping outlines.
+        outlineView.subviews
+            .compactMap { $0 as? TreeHierarchyChangeOverlay }
+            .forEach { $0.removeFromSuperview() }
+
+        let nodeRowRect = outlineView.rect(ofRow: nodeRow)
+        let parentRowRect = outlineView.rect(ofRow: parentRow)
+        guard !nodeRowRect.isEmpty, !parentRowRect.isEmpty else { return }
+
+        let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
+
+        // Draw around the actual parent and node row positions, in the overlay's space.
+        let nodeRect = overlay.convert(nodeRowRect, from: outlineView)
+        let parentRect = overlay.convert(parentRowRect, from: outlineView)
+        overlay.highlightRect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
+            guard let overlay else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.62
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                overlay.animator().alphaValue = 0
+            } completionHandler: {
+                overlay.removeFromSuperview()
+            }
         }
     }
 
