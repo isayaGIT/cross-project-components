@@ -21,6 +21,10 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var onDelete: ([AnyHashable]) -> Void = { _ in }
     private var onIndent: ([AnyHashable]) -> Void = { _ in }
     private var onOutdent: ([AnyHashable]) -> Void = { _ in }
+    private var canUndo = false
+    private var canRedo = false
+    private var onUndo: () -> Void = {}
+    private var onRedo: () -> Void = {}
     private var contextMenuID: AnyHashable?
     private var onRowInteraction: (AnyHashable) -> Void = { _ in }
     private var onBeginEditing: (AnyHashable) -> Void = { _ in }
@@ -68,6 +72,8 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
         outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
+        outlineView.onUndo = { [weak self] in self?.onUndo() }
+        outlineView.onRedo = { [weak self] in self?.onRedo() }
         outlineView.onContextMenu = { [weak self] id in self?.makeContextMenu(for: id) }
         scrollView.documentView = outlineView
         container.addSubview(scrollView)
@@ -94,6 +100,10 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onDelete newOnDelete: @escaping ([AnyHashable]) -> Void,
         onIndent newOnIndent: @escaping ([AnyHashable]) -> Void,
         onOutdent newOnOutdent: @escaping ([AnyHashable]) -> Void,
+        canUndo newCanUndo: Bool,
+        canRedo newCanRedo: Bool,
+        onUndo newOnUndo: @escaping () -> Void,
+        onRedo newOnRedo: @escaping () -> Void,
         onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void,
         onBeginEditing newOnBeginEditing: @escaping (AnyHashable) -> Void
     ) {
@@ -106,6 +116,10 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onDelete = newOnDelete
         onIndent = newOnIndent
         onOutdent = newOnOutdent
+        canUndo = newCanUndo
+        canRedo = newCanRedo
+        onUndo = newOnUndo
+        onRedo = newOnRedo
         onRowInteraction = newOnRowInteraction
         onBeginEditing = newOnBeginEditing
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
@@ -113,6 +127,8 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
         outlineView.onIndentKey = { [weak self] shift in self?.handleIndentKey(shift: shift) }
+        outlineView.onUndo = { [weak self] in self?.onUndo() }
+        outlineView.onRedo = { [weak self] in self?.onRedo() }
         outlineView.onContextMenu = { [weak self] id in self?.makeContextMenu(for: id) }
 
         let treeChanged = root == nil || projection.structureSignature != TreeStructureSignature(newRoot)
@@ -244,11 +260,24 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         }
         contextMenuID = id
         let menu = NSMenu()
+        let undoItem = NSMenuItem(title: "Undo", action: #selector(contextUndo), keyEquivalent: "z")
+        undoItem.keyEquivalentModifierMask = [.command]
+        undoItem.isEnabled = canUndo
+        menu.addItem(undoItem)
+        let redoItem = NSMenuItem(title: "Redo", action: #selector(contextRedo), keyEquivalent: "z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        redoItem.isEnabled = canRedo
+        menu.addItem(redoItem)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Add node", action: #selector(contextAddNode), keyEquivalent: "")
         if id != root?.id {
             menu.addItem(.separator())
-            menu.addItem(withTitle: "Indent (Tab)", action: #selector(contextIndent), keyEquivalent: "")
-            menu.addItem(withTitle: "Outdent (Shift Tab)", action: #selector(contextOutdent), keyEquivalent: "")
+            let indentItem = NSMenuItem(title: "Indent", action: #selector(contextIndent), keyEquivalent: "\t")
+            indentItem.keyEquivalentModifierMask = []
+            menu.addItem(indentItem)
+            let outdentItem = NSMenuItem(title: "Outdent", action: #selector(contextOutdent), keyEquivalent: "\t")
+            outdentItem.keyEquivalentModifierMask = [.shift]
+            menu.addItem(outdentItem)
             menu.addItem(.separator())
             let deleteItem = NSMenuItem(
                 title: selectedItemsInTreeOrder().count > 1 ? "Delete selected nodes" : "Delete this node",
@@ -270,6 +299,8 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         _ = onCreateSibling(ids.last ?? contextMenuID)
     }
     @objc private func contextDelete() { handleDeleteKey() }
+    @objc private func contextUndo() { if canUndo { onUndo() } }
+    @objc private func contextRedo() { if canRedo { onRedo() } }
     @objc private func contextIndent() { handleIndentKey(shift: false) }
     @objc private func contextOutdent() { handleIndentKey(shift: true) }
 
@@ -403,10 +434,27 @@ private final class TreeOutlineView: NSOutlineView {
     var onReturn: (() -> Void)?
     var onDeleteKey: (() -> Void)?
     var onIndentKey: ((Bool) -> Void)?
+    var onUndo: (() -> Void)?
+    var onRedo: (() -> Void)?
     var onContextMenu: ((AnyHashable) -> NSMenu?)?
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Preserve native text undo while an inline title field or other text editor owns focus.
+        if window?.firstResponder is NSTextView { return super.performKeyEquivalent(with: event) }
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option])
+        if event.keyCode == 6, modifiers.contains(.command), !modifiers.contains(.control), !modifiers.contains(.option) {
+            if event.modifierFlags.contains(.shift) { onRedo?() } else { onUndo?() }
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option])
+        if event.keyCode == 6, modifiers.contains(.command), !modifiers.contains(.control), !modifiers.contains(.option) {
+            if event.modifierFlags.contains(.shift) { onRedo?() } else { onUndo?() }
+            return
+        }
         if (event.keyCode == 36 || event.keyCode == 76), modifiers.isEmpty { onReturn?(); return }
         if event.keyCode == 51,
            modifiers.contains(.command),

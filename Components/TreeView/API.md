@@ -40,7 +40,7 @@ Keep app-specific icons, thumbnails, row metrics, and other presentation choices
 - `onCreateSibling(currentID)` is called for Return/Enter only when no inline row editor is active. The host creates and returns the new node ID; pass `nil` to create at the top level when no row is selected.
 - The component selects the newly created node and marks it as editing. Double-clicking a row also starts editing its title.
 - `TreeRowContext.isEditing` lets the host render an inline editor. Call `onCommitEditing(title)` when the user presses Enter in that editor; this commits the title and exits editing without creating another node.
-- If a newly created node is committed with an empty or whitespace-only title, the component removes it through the host's `onDelete` callback. Empty renames of existing nodes are ignored.
+- If a newly created node is committed with an empty or whitespace-only title, the component removes it through the host's `onDelete` callback and restores selection to the row that preceded creation. Empty renames of existing nodes are ignored.
 - Creation is disabled while search filtering is active, because the filtered projection is not a safe basis for mutation placement.
 
 ## Editing and deletion
@@ -50,7 +50,7 @@ Keep app-specific icons, thumbnails, row metrics, and other presentation choices
 - Command+Backspace opens one confirmation only when the selected subtrees contain content; plain Backspace is left to the system. The confirmation reports the total number of nodes including descendants and the total content-item count. Selected descendants of another selected node are deduplicated; the visible Root cannot be deleted.
 - `contentCount` supplies the number of content items directly attached to each node. The component sums these values through each selected subtree before showing confirmation.
 - `onDelete` receives only the selected subtree roots to delete. `onIndent` and `onOutdent` receive selected IDs in tree order.
-- Right-click provides Add node, Delete, Indent (Tab), and Outdent (Shift Tab). Mutations and persistence remain the host's responsibility.
+- With the tree focused, Command+Z undoes the last committed tree change and Command+Shift+Z redoes it. Right-click provides Undo and Redo, Add node, Delete, Indent, and Outdent. Tab and Shift+Tab are displayed using native macOS menu key-equivalent symbols rather than being embedded in item titles. The host supplies `canUndo`, `canRedo`, `onUndo`, and `onRedo`; tree history and persistence remain the host's responsibility.
 
 ## Moving nodes
 

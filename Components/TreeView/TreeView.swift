@@ -50,7 +50,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     @Binding private var expandedIDs: Set<Node.ID>
     @Binding private var editingID: Node.ID?
     @Binding private var selectedIDs: Set<Node.ID>
-    @State private var pendingCreatedIDs: Set<Node.ID> = []
+    @State private var pendingCreatedPreviousIDs: [Node.ID: Node.ID] = [:]
     public let searchText: String
     private let searchableText: (Node) -> String
     private let rowHeight: (Node, Int) -> CGFloat
@@ -63,6 +63,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     private let onDelete: ([Node.ID]) -> Void
     private let onIndent: ([Node.ID]) -> Void
     private let onOutdent: ([Node.ID]) -> Void
+    private let canUndo: Bool
+    private let canRedo: Bool
+    private let onUndo: () -> Void
+    private let onRedo: () -> Void
     private let onRowInteraction: (Node.ID) -> Void
     private let interactiveHitTest: (Node, CGPoint, CGSize) -> Bool
     private let rowContent: (TreeRowContext<Node>) -> RowContent
@@ -85,6 +89,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         onDelete: @escaping ([Node.ID]) -> Void = { _ in },
         onIndent: @escaping ([Node.ID]) -> Void = { _ in },
         onOutdent: @escaping ([Node.ID]) -> Void = { _ in },
+        canUndo: Bool = false,
+        canRedo: Bool = false,
+        onUndo: @escaping () -> Void = {},
+        onRedo: @escaping () -> Void = {},
         onRowInteraction: @escaping (Node.ID) -> Void = { _ in },
         interactiveHitTest: @escaping (Node, CGPoint, CGSize) -> Bool = { _, _, _ in false },
         @ViewBuilder rowContent: @escaping (TreeRowContext<Node>) -> RowContent
@@ -106,6 +114,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self.onDelete = onDelete
         self.onIndent = onIndent
         self.onOutdent = onOutdent
+        self.canUndo = canUndo
+        self.canRedo = canRedo
+        self.onUndo = onUndo
+        self.onRedo = onRedo
         self.onRowInteraction = onRowInteraction
         self.interactiveHitTest = interactiveHitTest
         self.rowContent = rowContent
@@ -129,6 +141,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onDelete: deleteErased,
             onIndent: indentErased,
             onOutdent: outdentErased,
+            canUndo: canUndo,
+            canRedo: canRedo,
+            onUndo: { self.onUndo() },
+            onRedo: { self.onRedo() },
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
@@ -160,6 +176,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
             onDelete: deleteErased,
             onIndent: indentErased,
             onOutdent: outdentErased,
+            canUndo: canUndo,
+            canRedo: canRedo,
+            onUndo: { self.onUndo() },
+            onRedo: { self.onRedo() },
             onRowInteraction: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
@@ -194,9 +214,10 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let typedID = id?.base as? Node.ID
         guard let newID = onCreateSibling(typedID) else { return nil }
+        let previousID = typedID ?? selection ?? root.treeID
         selection = newID
         selectedIDs = [newID]
-        pendingCreatedIDs.insert(newID)
+        pendingCreatedPreviousIDs[newID] = previousID
         editingID = newID
         return AnyHashable(newID)
     }
@@ -244,15 +265,14 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 onCommitEditing: { title in
                     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
                     if trimmed.isEmpty {
-                        if pendingCreatedIDs.contains(node.treeID) {
-                            pendingCreatedIDs.remove(node.treeID)
+                        if let previousID = pendingCreatedPreviousIDs.removeValue(forKey: node.treeID) {
                             onDelete([node.treeID])
-                            selection = nil
-                            selectedIDs = []
+                            selection = previousID
+                            selectedIDs = [previousID]
                         }
                     } else {
                         onRename(node.treeID, trimmed)
-                        pendingCreatedIDs.remove(node.treeID)
+                        pendingCreatedPreviousIDs.removeValue(forKey: node.treeID)
                     }
                     if editingID == node.treeID { editingID = nil }
                 }
