@@ -4,7 +4,9 @@
 
 ## 当前组件：Filmstrip Scrubber（连续拖动胶片）
 
-![Filmstrip Scrubber animated demo](Examples/filmstrip-scrubber.gif)
+![Filmstrip Scrubber — real interaction recording](Examples/filmstrip-scrubber.gif)
+
+上方 GIF 来自真实录屏，展示胶片拖动过程与选中状态变化。
 
 来自 Project Knowledge Navigator 的胶片交互实现，已抽离宿主项目模型依赖。可连续像素级拖动浏览整组图片；视口裁切与边框分层绘制，拖动时边框不会被裁掉。支持选中回调，宿主项目可据此同步预览内容。
 
