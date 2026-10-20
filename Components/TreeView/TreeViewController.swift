@@ -345,9 +345,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             let oldParent = pending.oldParentByID[id] ?? nil
             guard let newParent = parentID(of: id, in: root), oldParent != newParent,
                   let nodeRow = rowIndex(for: id), let parentRow = rowIndex(for: newParent) else { continue }
-            // Read both row positions after the hierarchy update. These rects are in
-            // outlineView coordinates; convert them to the overlay's own coordinates
-            // before drawing so the highlight follows row positions, not window size.
+            // Read row geometry after the hierarchy update, never from the old tree.
             let nodeRowRect = outlineView.rect(ofRow: nodeRow)
             let parentRowRect = outlineView.rect(ofRow: parentRow)
             guard !nodeRowRect.isEmpty, !parentRowRect.isEmpty else { continue }
@@ -356,20 +354,12 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             overlay.autoresizingMask = [.width, .height]
             outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
 
+            // Convert both complete row rects into the overlay's coordinate space,
+            // then enclose their union. Do not manually choose minY/maxY as "top"
+            // or "bottom": AppKit's Y direction depends on whether a view is flipped.
             let nodeRect = overlay.convert(nodeRowRect, from: outlineView)
             let parentRect = overlay.convert(parentRowRect, from: outlineView)
-            // The top edge is the parent's visual top; the bottom edge is the
-            // currently operated node's visual bottom. AppKit's flipped coordinate
-            // systems are handled explicitly rather than caching pre-move geometry.
-            let topEdge = overlay.isFlipped ? parentRect.minY : parentRect.maxY
-            let bottomEdge = overlay.isFlipped ? nodeRect.maxY : nodeRect.minY
-            let rect = NSRect(
-                x: min(parentRect.minX, nodeRect.minX) + 3,
-                y: min(topEdge, bottomEdge) + 2,
-                width: max(1, max(parentRect.maxX, nodeRect.maxX) - min(parentRect.minX, nodeRect.minX) - 6),
-                height: max(6, abs(bottomEdge - topEdge) - 4)
-            )
-            overlay.highlightRect = rect
+            overlay.highlightRect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
                 guard let overlay else { return }
                 NSAnimationContext.runAnimationGroup { context in
@@ -633,6 +623,9 @@ private final class TreeOutlineView: NSOutlineView {
 }
 
 private final class TreeHierarchyChangeOverlay: NSView {
+    // Match the outline view's coordinate orientation so row geometry remains intuitive.
+    override var isFlipped: Bool { superview?.isFlipped ?? true }
+
     var highlightRect: NSRect = .zero
 
     override init(frame frameRect: NSRect) {
