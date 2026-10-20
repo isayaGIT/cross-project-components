@@ -28,8 +28,9 @@ public struct TreeRowContext<Node> {
     public let isEditing: Bool
     public let onRename: (String) -> Void
     public let onCommitEditing: (String) -> Void
+    public let shouldFinishEditingOnFocusLoss: () -> Bool
 
-    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onCommitEditing: @escaping (String) -> Void = { _ in }) {
+    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onCommitEditing: @escaping (String) -> Void = { _ in }, shouldFinishEditingOnFocusLoss: @escaping () -> Bool = { true }) {
         self.node = node
         self.depth = depth
         self.isSelected = isSelected
@@ -38,6 +39,24 @@ public struct TreeRowContext<Node> {
         self.isEditing = isEditing
         self.onRename = onRename
         self.onCommitEditing = onCommitEditing
+        self.shouldFinishEditingOnFocusLoss = shouldFinishEditingOnFocusLoss
+    }
+}
+
+private final class TreePointerInteractionTracker {
+    private var hasRecentInputTarget = false
+    private var targetRowID: AnyHashable?
+
+    func recordInputTarget(_ rowID: AnyHashable?) {
+        hasRecentInputTarget = true
+        targetRowID = rowID
+    }
+
+    func shouldFinishEditingOnFocusLoss(for rowID: AnyHashable) -> Bool {
+        guard hasRecentInputTarget else { return true }
+        hasRecentInputTarget = false
+        defer { targetRowID = nil }
+        return targetRowID != rowID
     }
 }
 
@@ -51,6 +70,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     @Binding private var editingID: Node.ID?
     @Binding private var selectedIDs: Set<Node.ID>
     @State private var pendingCreatedPreviousIDs: [Node.ID: Node.ID] = [:]
+    @State private var pointerInteractionTracker = TreePointerInteractionTracker()
     public let searchText: String
     private let searchableText: (Node) -> String
     private let rowHeight: (Node, Int) -> CGFloat
@@ -152,6 +172,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
             },
+            onPointerInteraction: { id in pointerInteractionTracker.recordInputTarget(id) },
             onBeginEditing: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.selection = typedID
@@ -187,6 +208,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
             },
+            onPointerInteraction: { id in pointerInteractionTracker.recordInputTarget(id) },
             onBeginEditing: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.selection = typedID
@@ -301,6 +323,9 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                         pendingCreatedPreviousIDs.removeValue(forKey: node.treeID)
                     }
                     if editingID == node.treeID { editingID = nil }
+                },
+                shouldFinishEditingOnFocusLoss: {
+                    pointerInteractionTracker.shouldFinishEditingOnFocusLoss(for: AnyHashable(node.treeID))
                 }
             )
             return TreeNodeSnapshot(

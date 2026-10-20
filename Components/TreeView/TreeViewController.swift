@@ -27,12 +27,30 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var onRedo: () -> Void = {}
     private var contextMenuID: AnyHashable?
     private var onRowInteraction: (AnyHashable) -> Void = { _ in }
+    private var onPointerInteraction: (AnyHashable?) -> Void = { _ in }
     private var onBeginEditing: (AnyHashable) -> Void = { _ in }
+    private var mouseDownMonitor: Any?
+    private var keyDownMonitor: Any?
+    private var resignActiveObserver: NSObjectProtocol?
     private var dragTokensByID: [AnyHashable: String] = [:]
     private var dragIDsByToken: [String: AnyHashable] = [:]
     private var isSynchronizingSelection = false
     private var isSynchronizingExpansion = false
     private var hasCompletedInitialConfiguration = false
+
+    deinit {
+        removeInputMonitors()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        installInputMonitors()
+    }
+
+    override func viewWillDisappear() {
+        removeInputMonitors()
+        super.viewWillDisappear()
+    }
 
     override func loadView() {
         let container = NSView(frame: .zero)
@@ -105,6 +123,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onUndo newOnUndo: @escaping () -> Void,
         onRedo newOnRedo: @escaping () -> Void,
         onRowInteraction newOnRowInteraction: @escaping (AnyHashable) -> Void,
+        onPointerInteraction newOnPointerInteraction: @escaping (AnyHashable?) -> Void,
         onBeginEditing newOnBeginEditing: @escaping (AnyHashable) -> Void
     ) {
         canMove = newCanMove
@@ -121,7 +140,9 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onUndo = newOnUndo
         onRedo = newOnRedo
         onRowInteraction = newOnRowInteraction
+        onPointerInteraction = newOnPointerInteraction
         onBeginEditing = newOnBeginEditing
+        installInputMonitors()
         outlineView.onRowMouseDown = { [weak self] id in self?.onRowInteraction(id) }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
@@ -204,6 +225,54 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         for id in newIDs.subtracting(oldIDs).sorted(by: { projection.depth(of: $0) < projection.depth(of: $1) }) {
             if let item = projection.itemsByID[id], !item.children.isEmpty, !outlineView.isItemExpanded(item) { outlineView.expandItem(item) }
         }
+    }
+
+    private func installInputMonitors() {
+        if mouseDownMonitor == nil {
+            mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+                guard let self else { return event }
+                self.onPointerInteraction(self.rowID(at: event))
+                return event
+            }
+        }
+        if keyDownMonitor == nil {
+            keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.onPointerInteraction(nil)
+                return event
+            }
+        }
+        if resignActiveObserver == nil {
+            resignActiveObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: NSApp,
+                queue: .main
+            ) { [weak self] _ in
+                self?.onPointerInteraction(nil)
+            }
+        }
+    }
+
+    private func removeInputMonitors() {
+        if let mouseDownMonitor {
+            NSEvent.removeMonitor(mouseDownMonitor)
+            self.mouseDownMonitor = nil
+        }
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+            self.keyDownMonitor = nil
+        }
+        if let resignActiveObserver {
+            NotificationCenter.default.removeObserver(resignActiveObserver)
+            self.resignActiveObserver = nil
+        }
+    }
+
+    private func rowID(at event: NSEvent) -> AnyHashable? {
+        guard let window = view.window, event.window === window else { return nil }
+        let point = outlineView.convert(event.locationInWindow, from: nil)
+        let row = outlineView.row(at: point)
+        guard row >= 0, let item = outlineView.item(atRow: row) as? TreeOutlineItem else { return nil }
+        return item.snapshot.id
     }
 
     private func handleReturnKey() {
