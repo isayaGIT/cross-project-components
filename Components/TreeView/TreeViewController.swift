@@ -250,7 +250,16 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             menu.addItem(withTitle: "Indent (Tab)", action: #selector(contextIndent), keyEquivalent: "")
             menu.addItem(withTitle: "Outdent (Shift Tab)", action: #selector(contextOutdent), keyEquivalent: "")
             menu.addItem(.separator())
-            menu.addItem(withTitle: selectedItemsInTreeOrder().count > 1 ? "Delete selected nodes" : "Delete this node", action: #selector(contextDelete), keyEquivalent: "")
+            let deleteItem = NSMenuItem(
+                title: selectedItemsInTreeOrder().count > 1 ? "Delete selected nodes" : "Delete this node",
+                action: #selector(contextDelete),
+                keyEquivalent: ""
+            )
+            deleteItem.attributedTitle = NSAttributedString(
+                string: deleteItem.title,
+                attributes: [.foregroundColor: NSColor.systemRed]
+            )
+            menu.addItem(deleteItem)
         }
         for menuItem in menu.items where !menuItem.isSeparatorItem { menuItem.target = self }
         return menu
@@ -399,7 +408,13 @@ private final class TreeOutlineView: NSOutlineView {
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option])
         if (event.keyCode == 36 || event.keyCode == 76), modifiers.isEmpty { onReturn?(); return }
-        if (event.keyCode == 51 || event.keyCode == 117), modifiers.isEmpty { onDeleteKey?(); return }
+        if event.keyCode == 51,
+           modifiers.contains(.command),
+           !modifiers.contains(.control),
+           !modifiers.contains(.option) {
+            onDeleteKey?()
+            return
+        }
         if event.keyCode == 48, modifiers.isEmpty { onIndentKey?(event.modifierFlags.contains(.shift)); return }
         super.keyDown(with: event)
     }
