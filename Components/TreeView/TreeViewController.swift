@@ -420,18 +420,18 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             if let parent = parentID(of: id, in: root), rowIndex(for: parent) != nil {
                 rowIDs.append(parent)
             }
-        } else {
-            // A node with descendants gets one enclosing outline around its visible
-            // subtree. Hidden descendants stay hidden; clicking never expands the tree.
-            func appendVisibleDescendants(of parent: TreeOutlineItem) {
-                for child in parent.allChildren {
-                    if rowIndex(for: child.snapshot.id) != nil {
-                        rowIDs.append(child.snapshot.id)
-                        appendVisibleDescendants(of: child)
-                    }
+        } else if let clickedRow = rowIndex(for: id) {
+            // Walk only rows currently visible in NSOutlineView. Recursing through
+            // `allChildren` visits every collapsed descendant too, making a click on
+            // a large subtree proportional to the entire hidden tree.
+            let subtreeDepth = item.snapshot.depth
+            if clickedRow + 1 < outlineView.numberOfRows {
+                for row in (clickedRow + 1)..<outlineView.numberOfRows {
+                    guard let visibleItem = outlineView.item(atRow: row) as? TreeOutlineItem,
+                          visibleItem.snapshot.depth > subtreeDepth else { break }
+                    rowIDs.append(visibleItem.snapshot.id)
                 }
             }
-            appendVisibleDescendants(of: item)
         }
         showRowGroupHighlight(for: rowIDs)
     }
@@ -732,12 +732,12 @@ private final class TreeOutlineView: NSOutlineView {
         // ownership so later drag/up events cannot leak into native Tree behavior.
         if activePointerSequence?.route == .embeddedView { return }
 
+        // Deliver immediate row feedback before AppKit's mouse tracking loop.
+        // Calling this after `super.mouseDown` can defer custom feedback until mouse-up.
+        if let id { onRowMouseDown?(id) }
         super.mouseDown(with: event)
         guard !pointerSequenceCancelled else { return }
-        if let id {
-            onRowMouseDown?(id)
-            if event.clickCount == 2 { onDoubleClick?(id) }
-        }
+        if let id, event.clickCount == 2 { onDoubleClick?(id) }
     }
 
     override func mouseDragged(with event: NSEvent) {
