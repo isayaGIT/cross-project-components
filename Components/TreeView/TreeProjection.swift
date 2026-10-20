@@ -13,13 +13,21 @@ struct TreeNodeSnapshot {
     let interactiveHitTest: (CGPoint, CGSize) -> Bool
     let gestureLayers: [any TreeGestureLayer]
 
-    func claimsEmbeddedGesture(_ context: TreeGestureHitTestContext) -> Bool {
-        for layer in gestureLayers.enumerated().sorted(by: {
-            $0.element.priority == $1.element.priority ? $0.offset < $1.offset : $0.element.priority > $1.element.priority
-        }).map(\.element) where layer.claims(context) {
-            return true
+    func resolveGesture(_ context: TreeGestureHitTestContext) -> TreeGestureDecision {
+        let orderedLayers = gestureLayers.enumerated().sorted {
+            $0.element.priority == $1.element.priority
+                ? $0.offset < $1.offset
+                : $0.element.priority > $1.element.priority
         }
-        return interactiveHitTest(context.point, context.size)
+        for (index, layer) in orderedLayers {
+            if let route = layer.resolution(for: context) {
+                return TreeGestureDecision(route: route, owner: .registeredLayer(index: index))
+            }
+        }
+        if interactiveHitTest(context.point, context.size) {
+            return TreeGestureDecision(route: .embeddedView, owner: .legacyHitTest)
+        }
+        return TreeGestureDecision(route: .treeNative, owner: .nativeTree)
     }
 
     let children: [TreeNodeSnapshot]
@@ -27,6 +35,18 @@ struct TreeNodeSnapshot {
 
     var subtreeNodeCount: Int { 1 + children.reduce(0) { $0 + $1.subtreeNodeCount } }
     var subtreeContentCount: Int { contentCount + children.reduce(0) { $0 + $1.subtreeContentCount } }
+}
+
+enum TreeGestureOwner: Equatable {
+    case registeredLayer(index: Int)
+    case legacyHitTest
+    case nativeTree
+}
+
+/// One arbitration result is retained while AppKit processes a native pointer sequence.
+struct TreeGestureDecision: Equatable {
+    let route: TreeGestureRoute
+    let owner: TreeGestureOwner
 }
 
 struct TreeStructureSignature: Equatable {

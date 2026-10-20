@@ -32,6 +32,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var mouseDownMonitor: Any?
     private var keyDownMonitor: Any?
     private var resignActiveObserver: NSObjectProtocol?
+    private var windowResignKeyObserver: NSObjectProtocol?
     private var dragTokensByID: [AnyHashable: String] = [:]
     private var dragIDsByToken: [String: AnyHashable] = [:]
     private var isSynchronizingSelection = false
@@ -50,6 +51,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
     override func viewWillDisappear() {
         removeInputMonitors()
+        outlineView.cancelActivePointerSequence()
         super.viewWillDisappear()
     }
 
@@ -87,7 +89,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         outlineView.outlineTableColumn = column
         outlineView.registerForDraggedTypes([.string, NSPasteboard.PasteboardType(UTType.plainText.identifier)])
         outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
-        outlineView.onEmbeddedGestureHit = { [weak self] event in self?.embeddedGestureClaims(event) ?? false }
+        outlineView.onGestureResolution = { [weak self] event in self?.resolveGesture(event) }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -146,7 +148,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         onBeginEditing = newOnBeginEditing
         installInputMonitors()
         outlineView.onRowMouseDown = { [weak self] id in self?.handleRowMouseDown(id) }
-        outlineView.onEmbeddedGestureHit = { [weak self] event in self?.embeddedGestureClaims(event) ?? false }
+        outlineView.onGestureResolution = { [weak self] event in self?.resolveGesture(event) }
         outlineView.onDoubleClick = { [weak self] id in self?.onBeginEditing(id) }
         outlineView.onReturn = { [weak self] in self?.handleReturnKey() }
         outlineView.onDeleteKey = { [weak self] in self?.handleDeleteKey() }
@@ -267,7 +269,19 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
                 object: NSApp,
                 queue: .main
             ) { [weak self] _ in
+                self?.outlineView.cancelActivePointerSequence()
                 self?.onPointerInteraction(nil)
+            }
+        }
+        if windowResignKeyObserver == nil {
+            windowResignKeyObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self, notification.object as? NSWindow === self.outlineView.window else { return }
+                self.outlineView.cancelActivePointerSequence()
+                self.onPointerInteraction(nil)
             }
         }
     }
@@ -284,6 +298,10 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         if let resignActiveObserver {
             NotificationCenter.default.removeObserver(resignActiveObserver)
             self.resignActiveObserver = nil
+        }
+        if let windowResignKeyObserver {
+            NotificationCenter.default.removeObserver(windowResignKeyObserver)
+            self.windowResignKeyObserver = nil
         }
     }
 
@@ -355,15 +373,15 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         return nil
     }
 
-    private func embeddedGestureClaims(_ event: NSEvent) -> Bool {
-        guard event.window === outlineView.window else { return false }
+    private func resolveGesture(_ event: NSEvent) -> TreeGestureDecision? {
+        guard event.window === outlineView.window else { return nil }
         let pointInOutline = outlineView.convert(event.locationInWindow, from: nil)
         let row = outlineView.row(at: pointInOutline)
         guard row >= 0,
               outlineView.item(atRow: row) is TreeOutlineItem,
-              let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? TreeOutlineCellView else { return false }
+              let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? TreeOutlineCellView else { return nil }
         let pointInCell = cell.convert(event.locationInWindow, from: nil)
-        return cell.claimsEmbeddedGesture(at: pointInCell, event: event)
+        return cell.resolveGesture(at: pointInCell, event: event)
     }
 
     private func handleRowMouseDown(_ id: AnyHashable) {
@@ -639,7 +657,14 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
 
 private final class TreeOutlineView: NSOutlineView {
     var onRowMouseDown: ((AnyHashable) -> Void)?
-    var onEmbeddedGestureHit: ((NSEvent) -> Bool)?
+    var onGestureResolution: ((NSEvent) -> TreeGestureDecision?)?
+    private(set) var activePointerSequence: TreeGestureDecision?
+    private var pointerSequenceCancelled = false
+
+    func cancelActivePointerSequence() {
+        pointerSequenceCancelled = true
+        activePointerSequence = nil
+    }
     var onDoubleClick: ((AnyHashable) -> Void)?
     var onReturn: (() -> Void)?
     var onDeleteKey: (() -> Void)?
@@ -698,15 +723,82 @@ private final class TreeOutlineView: NSOutlineView {
         let point = convert(event.locationInWindow, from: nil)
         let row = row(at: point)
         let id = row >= 0 ? (item(atRow: row) as? TreeOutlineItem)?.snapshot.id : nil
-        // Resolve embedded layers before AppKit's native selection/drag path or node double-click.
-        // The cell hit-test normally routes directly to the hosted control; this guard ensures a
-        // claimed sequence can never leak into Tree actions if AppKit targets the outline instead.
-        if onEmbeddedGestureHit?(event) == true { return }
+        activePointerSequence = onGestureResolution?(event)
+            ?? TreeGestureDecision(route: .treeNative, owner: .nativeTree)
+        pointerSequenceCancelled = false
+
+        // Both cell hit-testing and this event path use the same resolver. Normally AppKit targets
+        // the hosted control directly. If the outline receives this event instead, retain embedded
+        // ownership so later drag/up events cannot leak into native Tree behavior.
+        if activePointerSequence?.route == .embeddedView { return }
+
         super.mouseDown(with: event)
+        guard !pointerSequenceCancelled else { return }
         if let id {
             onRowMouseDown?(id)
             if event.clickCount == 2 { onDoubleClick?(id) }
         }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard !pointerSequenceCancelled, activePointerSequence?.route != .embeddedView else { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard !pointerSequenceCancelled else { activePointerSequence = nil; return }
+        if activePointerSequence?.route == .embeddedView {
+            activePointerSequence = nil
+            return
+        }
+        super.mouseUp(with: event)
+        activePointerSequence = nil
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        activePointerSequence = onGestureResolution?(event)
+            ?? TreeGestureDecision(route: .treeNative, owner: .nativeTree)
+        pointerSequenceCancelled = false
+        guard activePointerSequence?.route != .embeddedView else { return }
+        super.rightMouseDown(with: event)
+    }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        guard !pointerSequenceCancelled, activePointerSequence?.route != .embeddedView else { return }
+        super.rightMouseDragged(with: event)
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        guard !pointerSequenceCancelled else { activePointerSequence = nil; return }
+        if activePointerSequence?.route == .embeddedView {
+            activePointerSequence = nil
+            return
+        }
+        super.rightMouseUp(with: event)
+        activePointerSequence = nil
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        activePointerSequence = onGestureResolution?(event)
+            ?? TreeGestureDecision(route: .treeNative, owner: .nativeTree)
+        pointerSequenceCancelled = false
+        guard activePointerSequence?.route != .embeddedView else { return }
+        super.otherMouseDown(with: event)
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        guard !pointerSequenceCancelled, activePointerSequence?.route != .embeddedView else { return }
+        super.otherMouseDragged(with: event)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard !pointerSequenceCancelled else { activePointerSequence = nil; return }
+        if activePointerSequence?.route == .embeddedView {
+            activePointerSequence = nil
+            return
+        }
+        super.otherMouseUp(with: event)
+        activePointerSequence = nil
     }
 }
 
@@ -763,8 +855,8 @@ private final class TreeOutlineCellView: NSView {
 
     // Hit testing also runs during cursor/tracking updates, when NSApp.currentEvent may be
     // a non-mouse event. Only callers handling an actual pointer event should supply it.
-    func claimsEmbeddedGesture(at pointInCell: CGPoint, event: NSEvent? = nil) -> Bool {
-        guard let snapshot else { return false }
+    func resolveGesture(at pointInCell: CGPoint, event: NSEvent? = nil) -> TreeGestureDecision? {
+        guard let snapshot else { return nil }
         let kind: TreeGestureKind
         switch event?.type {
         case .rightMouseDown, .rightMouseDragged, .rightMouseUp: kind = .secondaryPointer
@@ -779,7 +871,7 @@ private final class TreeOutlineCellView: NSView {
             clickCount: event?.clickCount ?? 1,
             modifierFlags: event?.modifierFlags.rawValue ?? 0
         )
-        return snapshot.claimsEmbeddedGesture(context)
+        return snapshot.resolveGesture(context)
     }
 
     func configure(item: TreeOutlineItem) {
@@ -809,7 +901,7 @@ private final class TreeOutlineCellView: NSView {
         // Hit testing is location-only. Do not inspect NSApp.currentEvent here: AppKit also
         // calls hitTest during tracking/cursor updates, where NSEvent.clickCount is invalid.
         // Native mouse-down arbitration supplies its concrete NSEvent separately.
-        guard claimsEmbeddedGesture(at: point) else { return nil }
+        guard resolveGesture(at: point)?.route == .embeddedView else { return nil }
         return host.hitTest(pointInHost) ?? host
     }
 }

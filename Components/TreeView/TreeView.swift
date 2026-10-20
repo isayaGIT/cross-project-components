@@ -45,12 +45,31 @@ public struct TreeGestureHitTestContext {
     }
 }
 
+/// The delivery path selected by gesture arbitration.
+public enum TreeGestureRoute: Equatable, Sendable {
+    /// Deliver the sequence to the row's hosted SwiftUI/AppKit content.
+    case embeddedView
+    /// Keep the sequence in the native NSOutlineView event path.
+    case treeNative
+}
+
 /// A host-defined gesture layer. Higher priorities are resolved first; registration order breaks ties.
-/// Claiming a pointer sequence routes it to the embedded row view and prevents native Tree gestures
-/// from interpreting the same input as selection, dragging, or node editing.
+/// Existing layers can keep implementing `claims(_:)`; its default resolution routes claimed input
+/// to the embedded row view. A layer may override `resolution(for:)` to select the native Tree route.
 public protocol TreeGestureLayer {
     var priority: Int { get }
     func claims(_ context: TreeGestureHitTestContext) -> Bool
+    func resolution(for context: TreeGestureHitTestContext) -> TreeGestureRoute?
+}
+
+public extension TreeGestureLayer {
+    /// Default for route-first layers that do not use the legacy boolean claim API.
+    func claims(_ context: TreeGestureHitTestContext) -> Bool { false }
+
+    /// Compatibility adapter for existing boolean-claim layers.
+    func resolution(for context: TreeGestureHitTestContext) -> TreeGestureRoute? {
+        claims(context) ? .embeddedView : nil
+    }
 }
 
 /// State supplied to a host-defined row renderer.
