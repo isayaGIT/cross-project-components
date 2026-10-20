@@ -37,6 +37,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var isSynchronizingSelection = false
     private var isSynchronizingExpansion = false
     private var hasCompletedInitialConfiguration = false
+    private var pendingHierarchyChange: (oldParentByID: [AnyHashable: AnyHashable?], nodeIDs: [AnyHashable])?
 
     deinit {
         removeInputMonitors()
@@ -187,6 +188,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
                 outlineView.scrollRowToVisible(row)
             }
             hasCompletedInitialConfiguration = true
+            showPendingHierarchyChangeIfNeeded()
         } else {
             // Refresh row content (e.g. external selection flags or host metadata) without
             // rebuilding the native hierarchy, which keeps scroll and expansion stable.
@@ -319,8 +321,50 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private func handleIndentKey(shift: Bool) {
         guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let ids = selectedItemsInTreeOrder().map { $0.snapshot.id }.filter { $0 != root?.id }
-        guard !ids.isEmpty else { return }
+        guard !ids.isEmpty, let root else { return }
+        pendingHierarchyChange = (
+            oldParentByID: Dictionary(uniqueKeysWithValues: ids.map { ($0, parentID(of: $0, in: root)) }),
+            nodeIDs: ids
+        )
         if shift { onOutdent(ids) } else { onIndent(ids) }
+    }
+
+    private func parentID(of targetID: AnyHashable, in node: TreeNodeSnapshot, parent: AnyHashable? = nil) -> AnyHashable? {
+        if node.id == targetID { return parent }
+        for child in node.children {
+            if let found = parentID(of: targetID, in: child, parent: node.id) { return found }
+        }
+        return nil
+    }
+
+    private func showPendingHierarchyChangeIfNeeded() {
+        guard let pending = pendingHierarchyChange else { return }
+        pendingHierarchyChange = nil
+        guard let root else { return }
+        for id in pending.nodeIDs {
+            let oldParent = pending.oldParentByID[id] ?? nil
+            guard let newParent = parentID(of: id, in: root), oldParent != newParent,
+                  let nodeRow = rowIndex(for: id), let parentRow = rowIndex(for: newParent) else { continue }
+            let nodeRect = outlineView.rect(ofRow: nodeRow)
+            let parentRect = outlineView.rect(ofRow: parentRow)
+            guard !nodeRect.isEmpty, !parentRect.isEmpty else { continue }
+            let rect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
+            let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
+            overlay.highlightRect = rect
+            overlay.autoresizingMask = [.width, .height]
+            outlineView.addSubview(overlay, positioned: .above, relativeTo: nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak overlay] in
+                guard let overlay else { return }
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.62
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    overlay.animator().alphaValue = 0
+                } completionHandler: {
+                    overlay.removeFromSuperview()
+                }
+            }
+            return
+        }
     }
 
     private func makeContextMenu(for id: AnyHashable) -> NSMenu? {
@@ -569,6 +613,28 @@ private final class TreeOutlineView: NSOutlineView {
             if event.clickCount == 2 { onDoubleClick?(id) }
         }
     }
+}
+
+private final class TreeHierarchyChangeOverlay: NSView {
+    var highlightRect: NSRect = .zero
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard !highlightRect.isEmpty else { return }
+        NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
+        let path = NSBezierPath(roundedRect: highlightRect, xRadius: 7, yRadius: 7)
+        path.lineWidth = 1.5
+        path.stroke()
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 private final class TreeOutlineRowView: NSTableRowView {
