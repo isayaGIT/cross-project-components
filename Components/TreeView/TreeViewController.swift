@@ -761,7 +761,9 @@ private final class TreeOutlineCellView: NSView {
         return CGPoint(x: point.x, y: host.isFlipped ? point.y : size.height - point.y)
     }
 
-    func claimsEmbeddedGesture(at pointInCell: CGPoint, event: NSEvent? = NSApp.currentEvent) -> Bool {
+    // Hit testing also runs during cursor/tracking updates, when NSApp.currentEvent may be
+    // a non-mouse event. Only callers handling an actual pointer event should supply it.
+    func claimsEmbeddedGesture(at pointInCell: CGPoint, event: NSEvent? = nil) -> Bool {
         guard let snapshot else { return false }
         let kind: TreeGestureKind
         switch event?.type {
@@ -804,7 +806,9 @@ private final class TreeOutlineCellView: NSView {
         guard let host else { return nil }
         let pointInHost = host.convert(point, from: self)
 
-        // One resolver defines both hosted-control hit testing and native-event arbitration.
+        // Hit testing is location-only. Do not inspect NSApp.currentEvent here: AppKit also
+        // calls hitTest during tracking/cursor updates, where NSEvent.clickCount is invalid.
+        // Native mouse-down arbitration supplies its concrete NSEvent separately.
         guard claimsEmbeddedGesture(at: point) else { return nil }
         return host.hitTest(pointInHost) ?? host
     }
