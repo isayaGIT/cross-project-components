@@ -37,7 +37,7 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
     private var isSynchronizingSelection = false
     private var isSynchronizingExpansion = false
     private var hasCompletedInitialConfiguration = false
-    private var pendingHierarchyChange: (oldParentByID: [AnyHashable: AnyHashable?], nodeIDs: [AnyHashable])?
+    private var pendingHierarchyChange: (oldParentByID: [AnyHashable: AnyHashable?], nodeIDs: [AnyHashable], anchorBottomByID: [AnyHashable: CGFloat])?
 
     deinit {
         removeInputMonitors()
@@ -324,7 +324,13 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
         guard !ids.isEmpty, let root else { return }
         pendingHierarchyChange = (
             oldParentByID: Dictionary(uniqueKeysWithValues: ids.map { ($0, parentID(of: $0, in: root)) }),
-            nodeIDs: ids
+            nodeIDs: ids,
+            // Keep the lower edge anchored to the moved row's pre-change position.
+            // Only the upper edge should move as the direct parent changes.
+            anchorBottomByID: Dictionary(uniqueKeysWithValues: ids.compactMap { id in
+                guard let row = rowIndex(for: id) else { return nil }
+                return (id, outlineView.rect(ofRow: row).maxY)
+            })
         )
         if shift { onOutdent(ids) } else { onIndent(ids) }
     }
@@ -348,7 +354,15 @@ final class TreeViewController: NSViewController, NSOutlineViewDataSource, NSOut
             let nodeRect = outlineView.rect(ofRow: nodeRow)
             let parentRect = outlineView.rect(ofRow: parentRow)
             guard !nodeRect.isEmpty, !parentRect.isEmpty else { continue }
-            let rect = NSUnionRect(nodeRect, parentRect).insetBy(dx: 3, dy: 2)
+            let top = min(parentRect.minY, nodeRect.minY)
+            let anchoredBottom = pending.anchorBottomByID[id] ?? nodeRect.maxY
+            let bottom = max(top + 6, anchoredBottom)
+            let rect = NSRect(
+                x: min(parentRect.minX, nodeRect.minX) + 3,
+                y: top + 2,
+                width: max(parentRect.maxX, nodeRect.maxX) - min(parentRect.minX, nodeRect.minX) - 6,
+                height: bottom - top - 4
+            )
             let overlay = TreeHierarchyChangeOverlay(frame: outlineView.bounds)
             overlay.highlightRect = rect
             overlay.autoresizingMask = [.width, .height]
