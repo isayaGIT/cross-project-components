@@ -1,6 +1,6 @@
 # MarkdownPreview
 
-A reusable SwiftUI view for displaying GitHub-Flavored Markdown in native macOS and iOS interfaces. Rendering is provided by [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) (MIT).
+A reusable SwiftUI view for displaying GitHub-Flavored Markdown in native macOS interfaces. Rendering is provided by [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) (MIT).
 
 ## Supported content
 
