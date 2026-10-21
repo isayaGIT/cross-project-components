@@ -17,7 +17,7 @@ let package = Package(
                 .product(name: "MarkdownUI", package: "swift-markdown-ui")
             ],
             path: "Components",
-            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif", "MessageComposer/demo.gif", "SwipeBack/demo.gif", "MarkdownPreview/README.md"]
+            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif", "MessageComposer/demo.gif", "SwipeBack/demo.gif", "MarkdownPreview/README.md", "VideoPlayer/README.md"]
         )
     ]
 )

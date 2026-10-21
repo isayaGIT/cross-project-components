@@ -67,6 +67,15 @@ struct LinkPreview: View {
 
 Build the package with `swift build` from the repository root.
 
+## VideoPlayerView
+
+A lightweight SwiftUI video player backed by Apple's AVKit and AVFoundation. It adds no third-party playback-engine dependency.
+
+- Component API and usage: Components/VideoPlayer/README.md
+- Accepts local file URLs, direct HTTP(S) media URLs, and system-compatible HLS playlists.
+- Native controls and full-screen playback; playback pauses when the component disappears.
+- Open-source design reference: SwiftPlayer (MIT); no source files copied.
+
 ## MarkdownPreview
 
 A reusable, read-only SwiftUI view for rendering GitHub-Flavored Markdown.
