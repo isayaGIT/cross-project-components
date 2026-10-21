@@ -66,3 +66,11 @@ struct LinkPreview: View {
 - This component does not provide tabs, bookmarks, extension support, a download manager, or full Safari parity. The host app decides where to present it and which URLs to trust.
 
 Build the package with `swift build` from the repository root.
+
+## MarkdownPreview
+
+A reusable, read-only SwiftUI view for rendering GitHub-Flavored Markdown.
+
+- [Component API and usage](Components/MarkdownPreview/README.md)
+- Supports headings, tables, task lists, fenced code, images, links, blockquotes, and lists.
+- Powered by [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui), an MIT-licensed open-source renderer.
