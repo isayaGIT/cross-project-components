@@ -28,10 +28,13 @@ public enum EmbeddedBrowserNavigationDecision {
 ///
 /// Bind `url` to control navigation from the host. HTTP(S) links are loaded in
 /// this view by default; non-web schemes are cancelled unless the host's
-/// `onNavigationRequest` explicitly allows them.
+/// `onNavigationRequest` explicitly allows them. Set `cacheKey` to a stable,
+/// unique identifier to retain a page's live WebKit state when the view is
+/// removed and recreated; up to six inactive pages are retained per process.
 public struct EmbeddedBrowserView: View {
     @Binding private var url: URL
     private let configuration: EmbeddedBrowserConfiguration
+    private let cacheKey: String?
     private let onNavigationRequest: ((URL) -> EmbeddedBrowserNavigationDecision)?
     private let onURLChange: ((URL) -> Void)?
     private let onLoadingChange: ((Bool) -> Void)?
@@ -43,6 +46,7 @@ public struct EmbeddedBrowserView: View {
     public init(
         url: Binding<URL>,
         configuration: EmbeddedBrowserConfiguration = .init(),
+        cacheKey: String? = nil,
         onNavigationRequest: ((URL) -> EmbeddedBrowserNavigationDecision)? = nil,
         onURLChange: ((URL) -> Void)? = nil,
         onLoadingChange: ((Bool) -> Void)? = nil,
@@ -50,6 +54,7 @@ public struct EmbeddedBrowserView: View {
     ) {
         self._url = url
         self.configuration = configuration
+        self.cacheKey = cacheKey
         self.onNavigationRequest = onNavigationRequest
         self.onURLChange = onURLChange
         self.onLoadingChange = onLoadingChange
@@ -103,6 +108,7 @@ public struct EmbeddedBrowserView: View {
 
             EmbeddedBrowserWebView(
                 url: $url,
+                cacheKey: cacheKey,
                 state: browserState,
                 onNavigationRequest: onNavigationRequest,
                 onURLChange: { newURL in
@@ -137,6 +143,32 @@ public struct EmbeddedBrowserView: View {
 }
 
 @MainActor
+private final class EmbeddedBrowserPageCache {
+    static let shared = EmbeddedBrowserPageCache()
+
+    private struct Entry {
+        let webView: WKWebView
+        var lastAccess: Date
+    }
+
+    private var entries: [String: Entry] = [:]
+    private let capacity = 6
+
+    func take(for key: String) -> WKWebView? {
+        guard let entry = entries.removeValue(forKey: key) else { return nil }
+        return entry.webView
+    }
+
+    func store(_ webView: WKWebView, for key: String) {
+        entries[key] = Entry(webView: webView, lastAccess: Date())
+        while entries.count > capacity {
+            guard let oldestKey = entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key else { break }
+            entries.removeValue(forKey: oldestKey)
+        }
+    }
+}
+
+@MainActor
 private final class EmbeddedBrowserState: ObservableObject {
     weak var webView: WKWebView?
     @Published var canGoBack = false
@@ -147,6 +179,7 @@ private final class EmbeddedBrowserState: ObservableObject {
 
 private struct EmbeddedBrowserWebView: NSViewRepresentable {
     @Binding var url: URL
+    let cacheKey: String?
     let state: EmbeddedBrowserState
     let onNavigationRequest: ((URL) -> EmbeddedBrowserNavigationDecision)?
     let onURLChange: ((URL) -> Void)?
@@ -155,6 +188,7 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
+            cacheKey: cacheKey,
             url: $url,
             state: state,
             onNavigationRequest: onNavigationRequest,
@@ -165,13 +199,26 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView(frame: .zero)
+        let cachedWebView = cacheKey.flatMap { EmbeddedBrowserPageCache.shared.take(for: $0) }
+        let webView = cachedWebView ?? WKWebView(frame: .zero)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         context.coordinator.attach(webView)
         state.webView = webView
-        webView.load(URLRequest(url: url))
+
+        // A retained page already owns its DOM, scroll position, history, and
+        // JavaScript state. Only issue a request when creating or changing it.
+        if cachedWebView == nil || webView.url != url {
+            webView.load(URLRequest(url: url))
+        }
         return webView
+    }
+
+    static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.detach(from: webView)
+        if let cacheKey = coordinator.cacheKey {
+            EmbeddedBrowserPageCache.shared.store(webView, for: cacheKey)
+        }
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
@@ -190,6 +237,7 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        let cacheKey: String?
         private var url: Binding<URL>
         private let state: EmbeddedBrowserState
         private var onNavigationRequest: ((URL) -> EmbeddedBrowserNavigationDecision)?
@@ -199,6 +247,7 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
         private var progressObservation: NSKeyValueObservation?
 
         init(
+            cacheKey: String?,
             url: Binding<URL>,
             state: EmbeddedBrowserState,
             onNavigationRequest: ((URL) -> EmbeddedBrowserNavigationDecision)?,
@@ -206,6 +255,7 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
             onLoadingChange: ((Bool) -> Void)?,
             onNavigationFailure: ((Error) -> Void)?
         ) {
+            self.cacheKey = cacheKey
             self.url = url
             self.state = state
             self.onNavigationRequest = onNavigationRequest
@@ -229,12 +279,25 @@ private struct EmbeddedBrowserWebView: NSViewRepresentable {
         }
 
         func attach(_ webView: WKWebView) {
+            state.isLoading = webView.isLoading
+            state.progress = webView.estimatedProgress
+            refreshNavigationState(webView)
             progressObservation = webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] webView, _ in
                 DispatchQueue.main.async {
                     self?.state.progress = webView.estimatedProgress
                     self?.refreshNavigationState(webView)
                 }
             }
+        }
+
+        func detach(from webView: WKWebView) {
+            // Capture the final URL before the view is unmounted, so the host
+            // can restore the same route when this cached page is selected again.
+            syncURL(webView)
+            progressObservation?.invalidate()
+            progressObservation = nil
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {

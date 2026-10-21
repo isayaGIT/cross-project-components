@@ -18,7 +18,7 @@
 
 ## EmbeddedBrowser
 
-A lightweight macOS in-app browser backed by Apple's `WKWebView` (WebKit). It is opt-in: presenting this component does not change link handling elsewhere in the host app.
+A lightweight macOS in-app browser backed by Apple's `WKWebView` (WebKit). It is opt-in: presenting this component does not change link handling elsewhere in the host app. Pass a stable, unique `cacheKey` to retain live page state (DOM, scroll position, navigation history, and JavaScript state) while the view is temporarily removed. Up to six inactive pages are retained per app process; this is not an offline snapshot cache, and pages still need to load when the app launches again.
 
 ```swift
 import CrossProjectComponents
@@ -34,6 +34,9 @@ struct LinkPreview: View {
                 showsNavigationControls: true,
                 showsAddressField: true
             ),
+            // Optional: preserve this page when the browser view is recreated.
+            // Use a stable, unique value for each independently retained page.
+            cacheKey: "example-com",
             onNavigationRequest: { requestedURL in
                 // HTTP(S) is allowed by default. Keep non-web schemes blocked
                 // unless the host explicitly chooses to allow them.
