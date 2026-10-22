@@ -1,0 +1,30 @@
+name: InputBarDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  CrossProjectComponents:
+    path: ../..
+targets:
+  InputBarDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.inputbardemo
+        PRODUCT_NAME: InputBarDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: CrossProjectComponents
+        product: CrossProjectComponentsIOS
+schemes:
+  InputBarDemo:
+    build:
+      targets:
+        InputBarDemo: all
+    run:
+      config: Debug
