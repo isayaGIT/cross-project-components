@@ -12,18 +12,19 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0"),
-        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", .upToNextMinor(from: "2.4.1"))
+        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", .upToNextMinor(from: "2.4.1")),
+        .package(path: "Shapes/LineDashed")
     ],
     targets: [
         .target(
             name: "CrossProjectComponents",
-            dependencies: [.product(name: "MarkdownUI", package: "swift-markdown-ui")],
+            dependencies: [.product(name: "MarkdownUI", package: "swift-markdown-ui"), .product(name: "LineDashed", package: "LineDashed")],
             path: "Components/macOS",
             exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif"]
         ),
         .target(
             name: "CrossProjectComponentsIOS",
-            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), "StickerData", "ImgData"],
+            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "LineDashed", package: "LineDashed"), "StickerData", "ImgData"],
             path: "Components/iOS",
             exclude: ["MessageComposer/README.md", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "MomentSingleMoment/Examples", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift"],
             resources: [.process("Resources")]

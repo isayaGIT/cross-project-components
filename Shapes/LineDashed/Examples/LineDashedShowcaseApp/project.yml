@@ -1,0 +1,22 @@
+name: LineDashedShowcaseApp
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  LineDashed:
+    path: ../..
+targets:
+  LineDashedShowcaseApp:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: LineDashed
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.linedashedshowcase
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
