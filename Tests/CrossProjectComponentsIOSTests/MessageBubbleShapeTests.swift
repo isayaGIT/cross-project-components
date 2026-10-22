@@ -55,8 +55,8 @@ final class MessageBubbleShapeTests: XCTestCase {
 
         XCTAssertTrue(leading.contains(CGPoint(x: 13, y: 59)))
         XCTAssertTrue(trailing.contains(CGPoint(x: 87, y: 59)))
-        XCTAssertFalse(leading.contains(CGPoint(x: 87, y: 59)))
-        XCTAssertFalse(trailing.contains(CGPoint(x: 13, y: 59)))
+        XCTAssertLessThan(leading.boundingRect.minX, bounds.minX)
+        XCTAssertGreaterThan(trailing.boundingRect.maxX, bounds.maxX)
     }
 
     func testRoundedTailFallsBackForUnsupportedCorner() {
@@ -80,6 +80,24 @@ final class MessageBubbleShapeTests: XCTestCase {
 
         XCTAssertEqual(actual.boundingRect, expected.boundingRect)
         XCTAssertTrue(actual.contains(CGPoint(x: 99, y: 59)))
+    }
+
+    func testEnhancedShapeUsesSingleContourWithMirroredTails() {
+        let leading = RoundedRectSmoothed(cornerRadius: 16, tail: .leading, tailWidth: 6, tailHeight: 10).path(in: bounds)
+        let trailing = RoundedRectSmoothed(cornerRadius: 16, tail: .trailing, tailWidth: 6, tailHeight: 10).path(in: bounds)
+
+        XCTAssertGreaterThan(trailing.boundingRect.maxX, bounds.maxX - 0.5)
+        XCTAssertLessThan(leading.boundingRect.minX, bounds.minX + 0.5)
+        XCTAssertEqual(trailing.boundingRect.width, leading.boundingRect.width, accuracy: 0.01)
+        XCTAssertEqual(trailing.boundingRect.height, leading.boundingRect.height, accuracy: 0.01)
+        XCTAssertTrue(trailing.contains(CGPoint(x: 50, y: 30)))
+        XCTAssertTrue(leading.contains(CGPoint(x: 50, y: 30)))
+    }
+
+    func testEnhancedShapeWithoutTailUsesFullHeight() {
+        let path = RoundedRectSmoothed(cornerRadius: 16).path(in: bounds)
+        XCTAssertEqual(path.boundingRect.maxY, bounds.maxY, accuracy: 0.01)
+        XCTAssertTrue(path.contains(CGPoint(x: 50, y: 59)))
     }
 
     func testMutatingRadiusCannotMakeItNegative() {

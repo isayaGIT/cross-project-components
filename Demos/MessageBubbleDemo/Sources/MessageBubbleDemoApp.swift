@@ -17,6 +17,8 @@ private struct MessageBubbleDemoView: View {
   @State private var showGallery = true
   @State private var useTail = false
   @State private var showTimestamp = true
+  @State private var messageFontSize = 16.0
+  @State private var messageLineSpacing = 3.0
 
   var body: some View {
     NavigationStack {
@@ -90,6 +92,24 @@ private struct MessageBubbleDemoView: View {
       }
       .pickerStyle(.segmented)
 
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text("Message font size")
+          Spacer()
+          Text("\(Int(messageFontSize)) pt").monospacedDigit().foregroundStyle(.secondary)
+        }
+        Slider(value: $messageFontSize, in: 12...24, step: 1)
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text("Line spacing")
+          Spacer()
+          Text("\(Int(messageLineSpacing)) pt").monospacedDigit().foregroundStyle(.secondary)
+        }
+        Slider(value: $messageLineSpacing, in: 0...12, step: 1)
+      }
+
       Toggle(isOn: $showTimestamp) {
         Label("Show external timestamps", systemImage: "clock")
       }
@@ -128,19 +148,20 @@ private struct MessageBubbleDemoView: View {
             sharpCorner: .bottomLeading,
             style: useTail ? .roundedTail : .tailLess,
             fill: Color(uiColor: .secondarySystemGroupedBackground),
+            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14),
             timestamp: showTimestamp ? "16:08" : nil,
             metadataAlignment: .leading,
-            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14)
+            font: .system(size: messageFontSize),
+            lineSpacing: messageLineSpacing
           ) {
             Text(
               "Hey! This is the incoming bubble. Notice the bottom-left corner is perfectly square."
             )
-            .font(.system(size: 16))
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
           }
           .overlay {
-            MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading)
+            MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading, style: useTail ? .roundedTail : .tailLess)
               .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
           }
         }
@@ -158,13 +179,14 @@ private struct MessageBubbleDemoView: View {
             sharpCorner: corner.sharpCorner,
             style: useTail ? .roundedTail : .tailLess,
             fill: bubbleFill,
+            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14),
             timestamp: showTimestamp ? "16:09" : nil,
             metadataAlignment: .trailing,
-            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14)
+            font: .system(size: messageFontSize),
+            lineSpacing: messageLineSpacing
           ) {
             Text("And this is the outgoing message. Drag the controls above to explore the shape.")
-              .font(.system(size: 16))
-              .foregroundStyle(.white)
+                .foregroundStyle(.white)
               .fixedSize(horizontal: false, vertical: true)
           }
           .shadow(color: .blue.opacity(0.16), radius: 9, y: 3)
@@ -191,7 +213,7 @@ private struct MessageBubbleDemoView: View {
           .fixedSize(horizontal: false, vertical: true)
         }
         .overlay {
-          MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading)
+          MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading, style: useTail ? .roundedTail : .tailLess)
             .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
         }
         Spacer(minLength: 26)

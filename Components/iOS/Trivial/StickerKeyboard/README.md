@@ -1,22 +1,43 @@
 # StickerKeyboard
 
-A lightweight SwiftUI Unicode emoji picker for iOS 17+.
+A lightweight, reusable SwiftUI image-sticker keyboard for iOS 17+. The panel renders image assets using `NukeUI`'s lazy image loader, so thumbnails load on demand and use Nuke's request/cache pipeline. The host supplies data and remains responsible for persistence, focus, draft insertion, and panel placement.
+
+## Image sticker keyboard
 
 ```swift
-StickerKeyboard { emoji in
-    draft.append(emoji)
-}
+import StickerData
+
+StickerKeyboard(
+    stickers: stickers,
+    packs: packs,
+    assets: assets,
+    userConfiguration: userStickerConfiguration,
+    defaultPackID: "default",
+    onSearch: { query in /* search the app-wide sticker catalogue */ },
+    onSearchRequested: { /* present StickerSearchSheet at the app/root overlay */ },
+    onSelect: { sticker in
+        // Resolve the selected sticker/asset and insert it into the message.
+    }
+)
 ```
 
-`StickerKeyboard` reports the selected emoji through `onSelect`; it does not own or edit a message draft, manage text-field focus, or position itself relative to an input bar.
+`StickerKeyboard` accepts the app's sticker models; it does not fetch catalog metadata or persist favorites/recent usage. `UserStickerConfiguration.selectedPackIDs` controls the visible pack order. The first three category entries are search, the configured default pack, and favorites. Additional tabs are the selected packs in their configured order. The first category opens `StickerSearchSheet`, which is deliberately separate from installed-pack browsing. Its `onSearch` callback is a handoff point for the app-wide sticker catalogue; this component does not pretend to connect a backend. Recommended terms are injected through `StickerSearchSheet.Configuration.recommendations`, allowing a future recommendation service to supply behavior-informed terms.
 
-Use `StickerKeyboard.Configuration` to configure the panel's preferred height and emoji grid column count. `StickerKeyboard.defaultHeight` exposes the standard panel height for hosts that need a layout contract. The height is measured in points; values below 180 points are clamped, and columns are clamped to 4...12.
+`StickerAsset.thumbnailLocation` is preferred for the grid; `originalLocation` is the fallback. Supply appropriately sized thumbnails for best scrolling performance. `LazyVGrid` creates cells on demand and Nuke manages image loading/caching. Remote URLs and local file URLs supported by Nuke can be used.
+
+## Layout contract
+
+`StickerKeyboard.defaultHeight` and `Configuration.height` expose the panel's preferred height. The component does not offset or resize the host input bar; the host owns layout and keyboard transitions.
 
 ```swift
-let pickerConfiguration = StickerKeyboard.Configuration(height: 300, columns: 8)
-StickerKeyboard(configuration: pickerConfiguration) { emoji in
-    draft.append(emoji)
-}
+let configuration = StickerKeyboard.Configuration(height: 300, columns: 5)
 ```
 
-The component uses native Unicode emoji glyphs and SF Symbols, with no image assets or third-party runtime dependency.
+The standard height is 286 points. Columns are clamped to `3...10`, sticker size to `36...100` points, and category bar height to at least 40 points.
+
+A compatibility initializer for the earlier Unicode picker remains available for existing callers. New integrations should use the data-driven initializer above.
+
+## Related reusable UI
+
+- `../SheetCustom`: configurable custom overlay sheet with point/fraction sizing and theme colors.
+- `../Capsules`: borderless text action capsule using a continuous rounded rectangle.

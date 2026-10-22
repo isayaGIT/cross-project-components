@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// A standalone, native SwiftUI message composer with an optional emoji picker.
+/// A standalone, native SwiftUI message composer with an optional sticker picker.
 ///
 /// The caller owns the draft and generation state. InputBar coordinates focus and
-/// panel presentation, while StickerKeyboard owns only its own emoji-picker UI.
+/// panel presentation, while StickerKeyboard owns only its own sticker-picker UI.
 public struct InputBar: View {
     @Binding private var text: String
     @Environment(\.colorScheme) private var colorScheme
@@ -26,7 +26,7 @@ public struct InputBar: View {
     ///   - placeholder: Placeholder shown while the draft is empty.
     ///   - isGenerating: Shows a stop control instead of send when `true`.
     ///   - maxLines: Maximum number of visible text lines before the field scrolls.
-    ///   - stickerKeyboardConfiguration: Public sizing and grid configuration for the emoji panel.
+    ///   - stickerKeyboardConfiguration: Public sizing and grid configuration for the sticker panel.
     ///   - onSend: Called for a non-empty draft when the user submits it.
     ///   - onStop: Called when generation is active and the stop control is tapped. The control is disabled when omitted.
     ///   - onAttach: Optional attachment action. Its control is hidden when omitted.
@@ -127,7 +127,7 @@ public struct InputBar: View {
                 } else {
                     accessoryButton(
                         systemName: "face.smiling",
-                        label: "Show emoji keyboard",
+                        label: "Show sticker keyboard",
                         action: showStickerKeyboard
                     )
                 }

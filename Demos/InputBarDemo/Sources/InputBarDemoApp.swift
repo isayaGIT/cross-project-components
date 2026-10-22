@@ -1,5 +1,6 @@
 import SwiftUI
 import CrossProjectComponentsIOS
+import StickerData
 
 @main
 struct InputBarDemoApp: App {
@@ -16,6 +17,9 @@ private struct InputBarDemoView: View {
         "Try typing a longer message to check multiline growth and keyboard behavior."
     ]
     @State private var activeAlert: DemoAlert?
+    @State private var isStickerPreviewPresented = false
+    @State private var isStickerSearchPresented = false
+    @State private var lastStickerSearch = ""
 
     var body: some View {
         NavigationStack {
@@ -69,8 +73,40 @@ private struct InputBarDemoView: View {
             }
             .navigationTitle("InputBar Demo")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Sticker UI") { isStickerPreviewPresented = true }
+                        .accessibilityLabel("Preview image sticker keyboard")
+                }
+            }
             .alert(item: $activeAlert) { alert in
-                Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
+                let message = alert == .stickerSearch
+                    ? "Search request: \(lastStickerSearch)\nThe app-wide catalogue service is not connected in this demo."
+                    : alert.message
+                return Alert(title: Text(alert.title), message: Text(message), dismissButton: .default(Text("OK")))
+            }
+        }
+        .overlay {
+            ZStack {
+                SheetCustom(
+                    isPresented: $isStickerPreviewPresented,
+                    configuration: .init(height: .points(390), background: Color(uiColor: .systemBackground))
+                ) {
+                    StickerKeyboardPreview(
+                        onSelect: { sticker in
+                            draft += " [\(sticker.name ?? sticker.id)] "
+                            isStickerPreviewPresented = false
+                        },
+                        onSearchRequested: { isStickerSearchPresented = true }
+                    )
+                }
+                .zIndex(1)
+
+                StickerSearchSheet(isPresented: $isStickerSearchPresented) { query in
+                    lastStickerSearch = query
+                    activeAlert = .stickerSearch
+                }
+                .zIndex(2)
             }
         }
     }
@@ -86,17 +122,61 @@ private struct InputBarDemoView: View {
 private enum DemoAlert: String, Identifiable {
     case attachment
     case tools
+    case stickerSearch
     var id: String { rawValue }
     var title: String {
         switch self {
         case .attachment: "Attachment action"
         case .tools: "Tools action"
+        case .stickerSearch: "Sticker search"
         }
     }
     var message: String {
         switch self {
         case .attachment: "The optional attachment callback is connected."
         case .tools: "The optional tools callback is connected."
+        case .stickerSearch: "The app-wide catalogue service is not connected in this demo."
         }
+    }
+}
+
+
+private struct StickerKeyboardPreview: View {
+    let onSelect: (Sticker) -> Void
+    let onSearchRequested: () -> Void
+
+    private let packs = [
+        StickerPack(id: "demo-default", name: "Daily", coverAssetID: "sun", stickerIDs: ["sun-sticker", "cloud-sticker", "leaf-sticker", "flower-sticker"]),
+        StickerPack(id: "demo-nature", name: "Nature", coverAssetID: "leaf", stickerIDs: ["leaf-sticker", "flower-sticker"])
+    ]
+    private let stickers = [
+        Sticker(id: "sun-sticker", packID: "demo-default", assetID: "sun", name: "Sunny", tags: ["sun", "happy", "weather"]),
+        Sticker(id: "cloud-sticker", packID: "demo-default", assetID: "cloud", name: "Cloud", tags: ["cloud", "weather"]),
+        Sticker(id: "leaf-sticker", packID: "demo-nature", assetID: "leaf", name: "Leaf", tags: ["nature", "green"]),
+        Sticker(id: "flower-sticker", packID: "demo-nature", assetID: "flower", name: "Flower", tags: ["nature", "flower"])
+    ]
+    private let assets = [
+        StickerAsset(id: "sun", originalLocation: URL(string: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=256&q=80") ?? URL(fileURLWithPath: "/dev/null")),
+        StickerAsset(id: "cloud", originalLocation: URL(string: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=256&q=80" )!),
+        StickerAsset(id: "leaf", originalLocation: URL(string: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=256&q=80")!),
+        StickerAsset(id: "flower", originalLocation: URL(string: "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=256&q=80")!)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Image Sticker Keyboard").font(.headline).padding(.horizontal, 16).padding(.top, 16)
+            Text("Live component preview · tap a sticker to insert it into the draft").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+            StickerKeyboard(
+                stickers: stickers,
+                packs: packs,
+                assets: assets,
+                userConfiguration: UserStickerConfiguration(selectedPackIDs: ["demo-nature"], favoriteStickerIDs: ["flower-sticker"]),
+                defaultPackID: "demo-default",
+                onSearch: { _ in },
+                onSearchRequested: onSearchRequested,
+                onSelect: onSelect
+            )
+        }
+        .background(.regularMaterial)
     }
 }

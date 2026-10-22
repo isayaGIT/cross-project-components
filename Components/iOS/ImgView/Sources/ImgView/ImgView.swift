@@ -2,6 +2,12 @@ import SwiftUI
 import Nuke
 import NukeUI
 
+private enum ImgViewPipeline {
+    static let shared = ImagePipeline { configuration in
+        configuration.isProgressiveDecodingEnabled = true
+    }
+}
+
 /// A reusable, full-screen image viewer with optional low-resolution previews and an injectable info panel.
 public struct ImgView<InfoPanel: View>: View {
     @Binding private var isPresented: Bool
@@ -16,10 +22,6 @@ public struct ImgView<InfoPanel: View>: View {
     @State private var offset: CGSize = .zero
     @State private var offsetAtGestureStart: CGSize = .zero
     @State private var retryToken = 0
-
-    private static let imagePipeline = ImagePipeline { configuration in
-        configuration.isProgressiveDecodingEnabled = true
-    }
 
     public init(
         isPresented: Binding<Bool>,
@@ -49,8 +51,13 @@ public struct ImgView<InfoPanel: View>: View {
                         .onTapGesture(count: 2, perform: toggleZoom)
                         .accessibilityLabel("Image preview")
                 } else {
-                    ContentUnavailableView("No Image", systemImage: "photo")
-                        .foregroundStyle(.white.opacity(0.8))
+                    VStack(spacing: 10) {
+                        Image(systemName: "photo")
+                            .font(.system(size: 36))
+                        Text("No Image")
+                            .font(.headline)
+                    }
+                    .foregroundStyle(.white.opacity(0.8))
                 }
 
                 VStack(spacing: 0) {
@@ -112,8 +119,10 @@ public struct ImgView<InfoPanel: View>: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .preferredColorScheme(.dark)
+            #if os(iOS)
             .statusBarHidden()
-            .onChange(of: isPresented) { _, presented in
+            #endif
+            .onChange(of: isPresented) { presented in
                 if !presented { showsInfo = false }
             }
         }
@@ -152,7 +161,7 @@ public struct ImgView<InfoPanel: View>: View {
             }
             .processors([.resize(size: CGSize(width: size.width * 2, height: size.height * 2))])
             .priority(.high)
-            .pipeline(Self.imagePipeline)
+            .pipeline(ImgViewPipeline.shared)
             .id(retryToken)
         }
         .scaleEffect(zoom)

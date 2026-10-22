@@ -26,7 +26,9 @@ MessageBubble(
     style: .roundedTail,
     fill: Color.gray.opacity(0.16),
     timestamp: "16:08",
-    metadataAlignment: .leading
+    metadataAlignment: .leading,
+    font: .system(size: 17, weight: .medium),
+    lineSpacing: 4
 ) {
     Text("An incoming message")
         .foregroundStyle(.primary)
@@ -48,7 +50,7 @@ MessageBubble(
 }
 ```
 
-The timestamp is optional. `nil` and an empty string both omit it without reserving space. Supply an already formatted string so the component stays independent of locale, time zone, and the app's message model. Set `metadataAlignment` to `.leading` for incoming messages and `.trailing` for outgoing messages.
+The `font` parameter controls the message content's inherited SwiftUI font (default `.body`), and `lineSpacing` controls additional spacing between lines (default `0`). Both apply to text inside the content closure unless an individual child explicitly overrides the font or line spacing. You can also set `.font(...)` and `.lineSpacing(...)` directly on individual views when mixed typography is needed. The timestamp is optional. `nil` and an empty string both omit it without reserving space. Supply an already formatted string so the component stays independent of locale, time zone, and the app's message model. Set `metadataAlignment` to `.leading` for incoming messages and `.trailing` for outgoing messages.
 
 For shape-only use:
 

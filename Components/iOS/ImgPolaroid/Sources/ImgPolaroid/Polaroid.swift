@@ -23,10 +23,9 @@ public struct Polaroid: View {
     @State private var localRotation: Double = 0
     @State private var dragTranslation: CGSize = .zero
     @State private var dragStartPosition: CGSize = .zero
-    @State private var rotationStartAngle: Double = 0
-    @State private var rotationStartPointerAngle: Double = 0
     @State private var cardCenterInGlobal = CGPoint.zero
     @State private var rotationPivotCenter = CGPoint.zero
+    @State private var previousRotationPointerAngle: Double?
     @State private var isDragging = false
     @State private var moveGestureStarted = false
     @State private var rotationGestureStarted = false
@@ -104,8 +103,6 @@ public struct Polaroid: View {
             // move the corner away from the finger while the angle is being updated.
             .scaleEffect(!rotationGestureStarted && (isRaised || isDragging) ? 1.035 : 1)
             .offset(x: position.width + dragTranslation.width, y: position.height + dragTranslation.height)
-            // Measure after all geometric transforms so the gesture uses the actual
-            // rendered center, not the pre-offset layout frame.
             .background {
                 GeometryReader { geometry in
                     let frame = geometry.frame(in: .global)
@@ -192,6 +189,10 @@ public struct Polaroid: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
+                // Corner rotation owns its drag. Do not let the card-surface drag
+                // update movement state if SwiftUI also delivers this event here.
+                guard !rotationGestureStarted else { return }
+
                 if !moveGestureStarted {
                     moveGestureStarted = true
                     dragStartPosition = position
@@ -207,6 +208,8 @@ public struct Polaroid: View {
                 dragTranslation = value.translation
             }
             .onEnded { value in
+                // A corner drag must never be committed as a card move or tap.
+                guard !rotationGestureStarted else { return }
                 let distance = hypot(value.translation.width, value.translation.height)
                 if distance >= dragThreshold {
                     var transaction = Transaction()
@@ -235,15 +238,14 @@ public struct Polaroid: View {
     private func rotationGesture(isLeading: Bool) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
+                // Accumulate each pointer movement instead of measuring every event
+                // against the initial ray. This avoids a fixed-start angle wrap when a
+                // continuous drag crosses the polar-angle discontinuity.
                 if !rotationGestureStarted {
-                    // Snapshot the rendered card center and pointer vector once. The
-                    // rotation is derived from the change in polar angle around this
-                    // fixed pivot; the card's position is never part of this calculation.
                     rotationGestureStarted = true
-                    rotationStartAngle = displayedRotation
                     rotationPivotCenter = cardCenterInGlobal
-                    rotationStartPointerAngle = PolaroidRotationMath.polarAngle(
-                        point: value.startLocation,
+                    previousRotationPointerAngle = PolaroidRotationMath.polarAngle(
+                        point: value.location,
                         center: rotationPivotCenter
                     )
                     longPressRecognized = false
@@ -258,24 +260,22 @@ public struct Polaroid: View {
                     point: value.location,
                     center: rotationPivotCenter
                 )
-                let angularDelta = PolaroidRotationMath.shortestAngularDelta(
-                    from: rotationStartPointerAngle,
-                    to: pointerAngle
-                )
-                // The leading (top-left) handle has the opposite drag convention in
-                // this interaction, so invert only its angular delta. The pivot and
-                // position remain unchanged; the trailing handle keeps the normal sign.
-                let angle = rotationStartAngle + (isLeading ? -angularDelta : angularDelta)
-
-                var transaction = Transaction()
-                transaction.animation = nil
-                withTransaction(transaction) {
-                    setRotation(angle)
+                if let previous = previousRotationPointerAngle {
+                    let delta = PolaroidRotationMath.shortestAngularDelta(from: previous, to: pointerAngle)
+                    // Preserve the established leading/trailing corner direction convention.
+                    let angle = displayedRotation + (isLeading ? -delta : delta)
+                    var transaction = Transaction()
+                    transaction.animation = nil
+                    withTransaction(transaction) {
+                        setRotation(angle)
+                    }
+                    onRotationChange?(angle)
                 }
-                onRotationChange?(angle)
+                previousRotationPointerAngle = pointerAngle
             }
             .onEnded { _ in
                 rotationGestureStarted = false
+                previousRotationPointerAngle = nil
                 moveGestureStarted = false
                 finishDrag()
                 setRaised(false)
@@ -301,13 +301,13 @@ private struct PolaroidGlobalCenterPreferenceKey: PreferenceKey {
 /// Angle tracking for rotation around the Polaroid card center. The pivot stays fixed;
 /// rotating never writes to the card position.
 enum PolaroidRotationMath {
-    /// Returns the pointer's polar angle around the card center, in degrees.
+    /// Returns the pointer's polar angle around a pivot, in radians.
     static func polarAngle(point: CGPoint, center: CGPoint) -> Double {
         atan2(point.y - center.y, point.x - center.x)
     }
 
-    /// Smallest signed angular difference from the initial pointer ray to the current
-    /// ray. This prevents a discontinuity when crossing the -π/π boundary.
+    /// Smallest signed angular difference between consecutive pointer rays.
+    /// Accumulating these deltas prevents a fixed-start wrap during long rotations.
     static func shortestAngularDelta(from start: Double, to current: Double) -> Double {
         atan2(sin(current - start), cos(current - start)) * 180 / .pi
     }
