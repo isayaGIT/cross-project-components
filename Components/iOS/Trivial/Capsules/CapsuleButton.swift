@@ -34,6 +34,7 @@ public struct CapsuleButton: View {
                 .font(font)
                 .foregroundStyle(foreground)
                 .padding(padding)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(background, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }

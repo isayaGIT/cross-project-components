@@ -7,7 +7,8 @@ A native SwiftUI primitive for chat bubbles. One public view supports two silhou
 - `MessageBubbleShape` owns the bubble outline and can be used directly with standard SwiftUI shape APIs.
 - `MessageBubbleStyle.tailLess` preserves the original single-shape silhouette with a configurable square corner.
 - `MessageBubbleStyle.roundedTail` draws a rounded bubble with an integrated lower-leading or lower-trailing tail in the same path. It does not layer a separate triangle over a rounded rectangle.
-- `MessageBubble<Content>` owns fill, content insets, optional dimensions, and optional timestamp presentation outside the bubble.
+- `MessageBubble<Content>` owns fill, content insets, optional dimensions, an optional outline, and optional timestamp presentation outside the bubble.
+- `MessageBubbleBorder` supports no border, a solid SwiftUI stroke, or the reusable `LineDashed` renderer with configurable dash geometry, fill, fill-coordinate mode, and phase. The outline uses the same final bubble path as the fill, so it follows the selected corner/tail geometry and the content’s measured size.
 - The host app owns message data, sender alignment in the conversation, grouping rules, timestamp formatting/localization, delivery state, and interactions.
 
 No chat timeline, networking, message model, theme engine, effect registry, or third-party dependency is included.
@@ -32,6 +33,18 @@ MessageBubble(
 ) {
     Text("An incoming message")
         .foregroundStyle(.primary)
+}
+
+MessageBubble(
+    sharpCorner: .bottomLeading,
+    style: .roundedTail,
+    fill: Color.gray.opacity(0.12),
+    border: .dashed(
+        configuration: .init(lineWidth: 2, dashLength: 7, dashSpacing: 4, cornerRadius: 1),
+        fill: .color(.purple)
+    )
+) {
+    Text("A message with a configurable dashed outline")
 }
 
 MessageBubble(

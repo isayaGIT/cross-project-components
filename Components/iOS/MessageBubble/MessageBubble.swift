@@ -1,4 +1,5 @@
 import SwiftUI
+import LineDashed
 
 /// The visual silhouette used by `MessageBubble`, backed by the reusable shape in Shapes/RoundedRectSmoothed.
 public enum MessageBubbleStyle: Sendable, Equatable {
@@ -56,6 +57,19 @@ public struct MessageBubbleShape: Shape {
     }
 }
 
+
+/// Optional outline rendered on the same final geometry as the message bubble.
+public enum MessageBubbleBorder {
+    case none
+    case solid(color: Color, lineWidth: CGFloat = 1)
+    case dashed(
+        configuration: DashedLineConfiguration = .init(),
+        fill: DashedLineFill = .color(.primary),
+        fillCoordinates: DashedLineFillCoordinates = .pathContinuous,
+        phase: CGFloat = 0
+    )
+}
+
 /// A reusable, content-agnostic chat bubble with an optional timestamp outside the silhouette.
 /// The host app remains responsible for message data, sender grouping, and timestamp formatting.
 public struct MessageBubble<Content: View>: View {
@@ -63,6 +77,7 @@ public struct MessageBubble<Content: View>: View {
     private let sharpCorner: MessageBubbleShape.SharpCorner
     private let style: MessageBubbleStyle
     private let fill: AnyShapeStyle
+    private let border: MessageBubbleBorder
     private let padding: EdgeInsets
     private let width: CGFloat?
     private let height: CGFloat?
@@ -80,6 +95,7 @@ public struct MessageBubble<Content: View>: View {
         cornerRadius: CGFloat = 16,
         sharpCorner: MessageBubbleShape.SharpCorner = .bottomTrailing,
         style: MessageBubbleStyle = .tailLess,
+        border: MessageBubbleBorder = .none,
         padding: EdgeInsets = EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14),
         width: CGFloat? = nil,
         height: CGFloat? = nil,
@@ -97,6 +113,7 @@ public struct MessageBubble<Content: View>: View {
             sharpCorner: sharpCorner,
             style: style,
             fill: Color.accentColor,
+            border: border,
             padding: padding,
             width: width,
             height: height,
@@ -117,6 +134,7 @@ public struct MessageBubble<Content: View>: View {
         sharpCorner: MessageBubbleShape.SharpCorner = .bottomTrailing,
         style: MessageBubbleStyle = .tailLess,
         fill: S,
+        border: MessageBubbleBorder = .none,
         padding: EdgeInsets = EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14),
         width: CGFloat? = nil,
         height: CGFloat? = nil,
@@ -133,6 +151,7 @@ public struct MessageBubble<Content: View>: View {
         self.sharpCorner = sharpCorner
         self.style = style
         self.fill = AnyShapeStyle(fill)
+        self.border = border
         self.padding = padding
         self.width = width
         self.height = height
@@ -159,6 +178,27 @@ public struct MessageBubble<Content: View>: View {
                 .frame(width: width, height: height, alignment: alignment)
                 .background {
                     bubbleShape.fill(fill)
+                }
+                .overlay {
+                    GeometryReader { geometry in
+                        let rect = CGRect(origin: .zero, size: geometry.size)
+                        switch border {
+                        case .none:
+                            EmptyView()
+                        case .solid(let color, let lineWidth):
+                            bubbleShape
+                                .stroke(color, lineWidth: lineWidth.isFinite ? max(0, lineWidth) : 0)
+                        case .dashed(let configuration, let dashFill, let coordinates, let phase):
+                            LineDashed(
+                                path: bubbleShape.path(in: rect),
+                                configuration: configuration,
+                                fill: dashFill,
+                                fillCoordinates: coordinates,
+                                phase: phase
+                            )
+                        }
+                    }
+                    .allowsHitTesting(false)
                 }
                 .contentShape(bubbleShape)
 

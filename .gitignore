@@ -5,3 +5,14 @@
 # Local demos and tests
 /demos/
 /tests/
+
+# Keep the ImgThumbnail demo app in the component repository.
+!/Demos/
+/Demos/*
+!/Demos/ImgThumbnailDemo/
+!/Demos/ImgThumbnailDemo/**
+
+# Keep the isolated Sticker Keyboard playground; ignore local build outputs.
+!/Demos/StickerKeyboardDemo/
+!/Demos/StickerKeyboardDemo/**
+Demos/StickerKeyboardDemo/build/

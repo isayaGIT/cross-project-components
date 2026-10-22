@@ -1,6 +1,6 @@
 # LineDashed
 
-A reusable SwiftUI dashed-path component. Each dash is an independent rounded rectangle positioned along a path by approximate arc length.
+A reusable SwiftUI dashed-path component. Each dash is a rounded-cap stroke segment sampled along the original path, preserving curve shape through rounded corners. Dash placement follows approximate arc length.
 
 ## Platforms
 
@@ -41,4 +41,4 @@ The interactive iOS Showcase is in `Examples/LineDashedShowcaseApp`; regenerate 
 
 ## Current limitations
 
-The path engine flattens quadratic and cubic curves with an internal tolerance, so curved-path placement is approximate. Checkerboard and grid fills are supported by the drawing renderer. The material types currently define the platform-adapter API surface only; system Material and Liquid Glass are not yet wired into the public `LineDashed` view. The first version also does not yet expose a dedicated animation configuration type; callers can animate the `phase` parameter themselves.
+The path engine flattens quadratic and cubic curves at a 0.1 pt tolerance. Curved-path placement is highly sampled but remains an approximation. Checkerboard and grid fills are supported by the drawing renderer. The material types currently define the platform-adapter API surface only; system Material and Liquid Glass are not yet wired into the public `LineDashed` view. The first version also does not yet expose a dedicated animation configuration type; callers can animate the `phase` parameter themselves.

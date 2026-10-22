@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// A standalone, native SwiftUI message composer with an optional sticker picker.
+/// A standalone, native SwiftUI message composer with an optional accessory panel.
 ///
-/// The caller owns the draft and generation state. InputBar coordinates focus and
-/// panel presentation, while StickerKeyboard owns only its own sticker-picker UI.
+/// The caller supplies the panel view. InputBar only coordinates focus and panel
+/// presentation; it does not know about or construct any specific keyboard type.
 public struct InputBar: View {
     @Binding private var text: String
     @Environment(\.colorScheme) private var colorScheme
@@ -13,7 +13,7 @@ public struct InputBar: View {
     private let placeholder: String
     private let isGenerating: Bool
     private let maxLines: Int
-    private let stickerKeyboardConfiguration: StickerKeyboard.Configuration
+    private let accessoryPanel: AnyView?
     private let onSend: () -> Void
     private let onStop: (() -> Void)?
     private let onAttach: (() -> Void)?
@@ -26,7 +26,7 @@ public struct InputBar: View {
     ///   - placeholder: Placeholder shown while the draft is empty.
     ///   - isGenerating: Shows a stop control instead of send when `true`.
     ///   - maxLines: Maximum number of visible text lines before the field scrolls.
-    ///   - stickerKeyboardConfiguration: Public sizing and grid configuration for the sticker panel.
+    ///   - accessoryPanel: Optional content shown when the accessory button is tapped. The supplied view owns its UI and behavior.
     ///   - onSend: Called for a non-empty draft when the user submits it.
     ///   - onStop: Called when generation is active and the stop control is tapped. The control is disabled when omitted.
     ///   - onAttach: Optional attachment action. Its control is hidden when omitted.
@@ -36,7 +36,7 @@ public struct InputBar: View {
         placeholder: String = "Message",
         isGenerating: Bool = false,
         maxLines: Int = 6,
-        stickerKeyboardConfiguration: StickerKeyboard.Configuration = .standard,
+        accessoryPanel: AnyView? = nil,
         onSend: @escaping () -> Void,
         onStop: (() -> Void)? = nil,
         onAttach: (() -> Void)? = nil,
@@ -46,7 +46,7 @@ public struct InputBar: View {
         self.placeholder = placeholder
         self.isGenerating = isGenerating
         self.maxLines = max(1, maxLines)
-        self.stickerKeyboardConfiguration = stickerKeyboardConfiguration
+        self.accessoryPanel = accessoryPanel
         self.onSend = onSend
         self.onStop = onStop
         self.onAttach = onAttach
@@ -60,13 +60,9 @@ public struct InputBar: View {
     public var body: some View {
         VStack(spacing: 0) {
             composer
-            if isStickerKeyboardPresented {
-                StickerKeyboard(configuration: stickerKeyboardConfiguration) { emoji in
-                    // SwiftUI's iOS 17 TextField API doesn't expose the insertion
-                    // selection, so the component appends to the controlled draft.
-                    text.append(emoji)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            if isStickerKeyboardPresented, let accessoryPanel {
+                accessoryPanel
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .background(.regularMaterial)
@@ -124,7 +120,7 @@ public struct InputBar: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Send message")
-                } else {
+                } else if accessoryPanel != nil {
                     accessoryButton(
                         systemName: "face.smiling",
                         label: "Show sticker keyboard",
@@ -164,6 +160,7 @@ public struct InputBar: View {
     }
 
     private func showStickerKeyboard() {
+        guard accessoryPanel != nil else { return }
         isTextFieldFocused = false
         withAnimation(.easeInOut(duration: 0.22)) {
             isStickerKeyboardPresented = true

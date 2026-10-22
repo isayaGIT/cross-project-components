@@ -18,7 +18,6 @@ private struct MomentSingleMomentShowcase: View {
         avatarURL: URL(string: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80")
     )
     @State private var liked = false
-    @State private var hasCommented = false
     @State private var likes: [MomentSingleMoment.Person] = [
         .init(id: "friend", name: "周周", avatarURL: URL(string: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80")),
         .init(id: "momo", name: "沫沫")
@@ -69,7 +68,6 @@ private struct MomentSingleMomentShowcase: View {
                             createdAt: .now.addingTimeInterval(-3600 * 2),
                             location: "莫干山",
                             isLikedByCurrentUser: liked,
-                            hasCommentedByCurrentUser: hasCommented,
                             likes: likes,
                             comments: comments
                         ),
@@ -83,7 +81,6 @@ private struct MomentSingleMomentShowcase: View {
                         },
                         onComment: { text in
                             comments.append(.init(author: .init(id: "me", name: "我"), text: text, createdAt: .now))
-                            hasCommented = true
                         }
                     )
 

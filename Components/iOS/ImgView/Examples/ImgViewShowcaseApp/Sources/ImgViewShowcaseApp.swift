@@ -9,7 +9,7 @@ struct ImgViewShowcaseApp: App {
 }
 
 private struct ImgViewShowcase: View {
-    @State private var showViewer = false
+    @State private var showViewer = true
     @State private var showInfo = false
     @State private var aiState = "尚未请求识图"
 

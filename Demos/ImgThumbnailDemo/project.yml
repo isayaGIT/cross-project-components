@@ -1,0 +1,30 @@
+name: ImgThumbnailDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  CrossProjectComponents:
+    path: ../..
+targets:
+  ImgThumbnailDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.imgthumbnaildemo
+        PRODUCT_NAME: ImgThumbnailDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: CrossProjectComponents
+        product: CrossProjectComponentsIOS
+schemes:
+  ImgThumbnailDemo:
+    build:
+      targets:
+        ImgThumbnailDemo: all
+    run:
+      config: Debug

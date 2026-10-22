@@ -31,6 +31,23 @@ final class LineDashedConfigurationTests: XCTestCase {
         XCTAssertEqual(segments.first?.angle ?? 0, 0, accuracy: 0.001)
     }
 
+    func testRoundedRectangleDashKeepsCurvedPathPoints() {
+        let path = Path(roundedRect: CGRect(x: 0, y: 0, width: 100, height: 70), cornerRadius: 20)
+        let segments = DashedLinePathEngine().segments(
+            path: path,
+            configuration: .init(lineWidth: 5, dashLength: 18, dashSpacing: 4, cornerRadius: 2)
+        )
+        XCTAssertFalse(segments.isEmpty)
+        XCTAssertTrue(segments.contains { segment in
+            guard segment.pathPoints.count > 2 else { return false }
+            let first = segment.pathPoints.first!
+            let last = segment.pathPoints.last!
+            return segment.pathPoints.dropFirst().dropLast().contains { point in
+                abs((last.x - first.x) * (point.y - first.y) - (last.y - first.y) * (point.x - first.x)) > 0.01
+            }
+        }, "At least one dash crossing a rounded corner should retain curved intermediate points")
+    }
+
     func testEmptyPathProducesNoSegments() {
         XCTAssertTrue(DashedLinePathEngine().segments(path: Path(), configuration: .init()).isEmpty)
     }

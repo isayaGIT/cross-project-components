@@ -1,0 +1,55 @@
+name: StickerKeyboardDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  Nuke:
+    url: https://github.com/kean/Nuke.git
+    from: 13.0.0
+  Animated:
+    path: ../../Components/iOS/Animated
+targets:
+  StickerData:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../../Class/Sticker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.stickerdata.demo
+        PRODUCT_NAME: StickerData
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SWIFT_VERSION: 5.0
+  StickerKeyboardDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: ../../Components/iOS/Trivial/StickerKeyboard/StickerKeyboard.swift
+      - path: ../../Components/iOS/Trivial/StickerKeyboard/StickerSearchSheet.swift
+      - path: ../../Components/iOS/Trivial/SheetCustom/SheetCustom.swift
+      - path: ../../Components/iOS/Trivial/Capsules/CapsuleButton.swift
+      - path: ../../Components/iOS/Trivial/TextFieldCustom/TextFieldCustom.swift
+      - path: ../../Class/Background/Background.swift
+      - path: ../../Class/Background/ColorCustom.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.stickerkeyboarddemo
+        PRODUCT_NAME: StickerKeyboardDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - target: StickerData
+      - package: Nuke
+        product: NukeUI
+      - package: Animated
+        product: Animated
+schemes:
+  StickerKeyboardDemo:
+    build:
+      targets:
+        StickerKeyboardDemo: all
+    run:
+      config: Debug

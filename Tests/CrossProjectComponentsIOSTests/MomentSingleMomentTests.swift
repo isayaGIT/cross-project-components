@@ -16,14 +16,14 @@ final class MomentSingleMomentTests: XCTestCase {
         XCTAssertEqual(model.comments.first?.text, "好看！")
     }
 
-    func testMediaListIsCappedAtNineForMomentsGrid() {
+    func testMediaListRetainsItemsBeyondNineForPagination() {
         let media = (0..<12).compactMap { index in
             URL(string: "https://example.com/\(index).jpg").map { MomentSingleMoment.Media(id: "photo-\(index)", url: $0) }
         }
-        let model = MomentSingleMoment.Model(author: author, text: "Nine grid", media: media)
-        XCTAssertEqual(model.media.count, 9)
+        let model = MomentSingleMoment.Model(author: author, text: "Paged grid", media: media)
+        XCTAssertEqual(model.media.count, 12)
         XCTAssertEqual(model.media.first?.id, "photo-0")
-        XCTAssertEqual(model.media.last?.id, "photo-8")
+        XCTAssertEqual(model.media.last?.id, "photo-11")
     }
 
     func testCommentSupportsReplyTargetAndOptionalTimestamp() {

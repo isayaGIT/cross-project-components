@@ -99,10 +99,8 @@ public struct Polaroid: View {
             }
             .contentShape(Rectangle())
             .rotationEffect(.degrees(displayedRotation))
-            // Keep the rotation geometry rigid: scaling during a corner drag would
-            // move the corner away from the finger while the angle is being updated.
-            .scaleEffect(!rotationGestureStarted && (isRaised || isDragging) ? 1.035 : 1)
-            .offset(x: position.width + dragTranslation.width, y: position.height + dragTranslation.height)
+            // Measure the card center before scale/offset modifiers. The geometry
+            // must track the actual card position rather than the unshifted layout frame.
             .background {
                 GeometryReader { geometry in
                     let frame = geometry.frame(in: .global)
@@ -113,6 +111,10 @@ public struct Polaroid: View {
                 }
             }
             .onPreferenceChange(PolaroidGlobalCenterPreferenceKey.self) { cardCenterInGlobal = $0 }
+            // Keep the rotation geometry rigid: scaling during a corner drag would
+            // move the corner away from the finger while the angle is being updated.
+            .scaleEffect(!rotationGestureStarted && (isRaised || isDragging) ? 1.035 : 1)
+            .offset(x: position.width + dragTranslation.width, y: position.height + dragTranslation.height)
             .shadow(
                 color: .black.opacity(showsShadow ? (isRaised || isDragging ? 0.22 : 0.12) : 0),
                 radius: isDragging ? 18 : (isRaised ? 13 : 6),
@@ -262,8 +264,9 @@ public struct Polaroid: View {
                 )
                 if let previous = previousRotationPointerAngle {
                     let delta = PolaroidRotationMath.shortestAngularDelta(from: previous, to: pointerAngle)
-                    // Preserve the established leading/trailing corner direction convention.
-                    let angle = displayedRotation + (isLeading ? -delta : delta)
+                    // Both corners belong to the same rigid card, so their angular
+                    // deltas must rotate the card in the same direction.
+                    let angle = displayedRotation + delta
                     var transaction = Transaction()
                     transaction.animation = nil
                     withTransaction(transaction) {

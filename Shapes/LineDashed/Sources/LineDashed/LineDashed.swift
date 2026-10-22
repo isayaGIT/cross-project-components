@@ -51,18 +51,22 @@ public struct LineDashed: View {
             guard !segments.isEmpty else { return }
             let globalRect = path.boundingRect
             for segment in segments {
-                var local = Path(roundedRect: CGRect(x: -segment.length / 2, y: -segment.width / 2, width: segment.length, height: segment.width), cornerSize: CGSize(width: segment.cornerRadius, height: segment.cornerRadius))
-                var transform = CGAffineTransform(rotationAngle: segment.angle)
-                transform.tx = segment.center.x
-                transform.ty = segment.center.y
-                local = local.applying(transform)
+                var centerline = Path()
+                guard let first = segment.pathPoints.first else { continue }
+                centerline.move(to: first)
+                for point in segment.pathPoints.dropFirst() { centerline.addLine(to: point) }
+                // Stroke the sampled path itself. Round caps provide the rounded dash ends,
+                // while intermediate points preserve arcs and other curves through corners.
                 switch fill {
                 case .checkerboard(let cellSize, let first, let second):
-                    drawCheckerboard(in: &context, clippedTo: local, globalRect: globalRect, segment: segment, cellSize: cellSize, first: first, second: second, coordinates: fillCoordinates)
+                    let clip = centerline.strokedPath(StrokeStyle(lineWidth: segment.width, lineCap: .round, lineJoin: .round))
+                    drawCheckerboard(in: &context, clippedTo: clip, globalRect: globalRect, segment: segment, cellSize: cellSize, first: first, second: second, coordinates: fillCoordinates)
                 case .grid(let cellSize, let lineWidth, let color, let background):
-                    drawGrid(in: &context, clippedTo: local, globalRect: globalRect, segment: segment, cellSize: cellSize, lineWidth: lineWidth, color: color, background: background, coordinates: fillCoordinates)
+                    var clip = Path()
+                    clip.addPath(centerline.strokedPath(StrokeStyle(lineWidth: segment.width, lineCap: .round, lineJoin: .round)))
+                    drawGrid(in: &context, clippedTo: clip, globalRect: globalRect, segment: segment, cellSize: cellSize, lineWidth: lineWidth, color: color, background: background, coordinates: fillCoordinates)
                 default:
-                    context.fill(local, with: shading(for: fill, in: globalRect, segment: segment, coordinates: fillCoordinates))
+                    context.stroke(centerline, with: shading(for: fill, in: globalRect, segment: segment, coordinates: fillCoordinates), style: StrokeStyle(lineWidth: segment.width, lineCap: .round, lineJoin: .round))
                 }
             }
         }

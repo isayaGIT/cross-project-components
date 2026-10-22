@@ -17,6 +17,7 @@ private struct MessageBubbleDemoView: View {
   @State private var showGallery = true
   @State private var useTail = false
   @State private var showTimestamp = true
+  @State private var borderStyle: BorderStyle = .dashed
   @State private var messageFontSize = 16.0
   @State private var messageLineSpacing = 3.0
 
@@ -115,6 +116,20 @@ private struct MessageBubbleDemoView: View {
       }
       .font(.subheadline)
 
+      VStack(alignment: .leading, spacing: 8) {
+        Label("Bubble border", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+          .font(.subheadline.weight(.semibold))
+        Picker("Bubble border", selection: $borderStyle) {
+          ForEach(BorderStyle.allCases) { option in
+            Text(option.title).tag(option)
+          }
+        }
+        .pickerStyle(.segmented)
+        Text("Dashed borders use LineDashed. Dash length, spacing, thickness and fill are configurable.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
       Toggle(isOn: $useGradient) {
         Label("Gradient fill", systemImage: "paintpalette")
       }
@@ -148,6 +163,7 @@ private struct MessageBubbleDemoView: View {
             sharpCorner: .bottomLeading,
             style: useTail ? .roundedTail : .tailLess,
             fill: Color(uiColor: .secondarySystemGroupedBackground),
+            border: currentBorder,
             padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14),
             timestamp: showTimestamp ? "16:08" : nil,
             metadataAlignment: .leading,
@@ -159,10 +175,6 @@ private struct MessageBubbleDemoView: View {
             )
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
-          }
-          .overlay {
-            MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading, style: useTail ? .roundedTail : .tailLess)
-              .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
           }
         }
         Spacer(minLength: 16)
@@ -179,6 +191,7 @@ private struct MessageBubbleDemoView: View {
             sharpCorner: corner.sharpCorner,
             style: useTail ? .roundedTail : .tailLess,
             fill: bubbleFill,
+            border: currentBorder,
             padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14),
             timestamp: showTimestamp ? "16:09" : nil,
             metadataAlignment: .trailing,
@@ -199,7 +212,8 @@ private struct MessageBubbleDemoView: View {
         MessageBubble(
           cornerRadius: radius,
           sharpCorner: .bottomLeading,
-          fill: Color(uiColor: .secondarySystemGroupedBackground)
+          fill: Color(uiColor: .secondarySystemGroupedBackground),
+          border: currentBorder
         ) {
           VStack(alignment: .leading, spacing: 6) {
             Text("Long content stays content-driven")
@@ -211,10 +225,6 @@ private struct MessageBubbleDemoView: View {
             .foregroundStyle(.secondary)
           }
           .fixedSize(horizontal: false, vertical: true)
-        }
-        .overlay {
-          MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading, style: useTail ? .roundedTail : .tailLess)
-            .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
         }
         Spacer(minLength: 26)
       }
@@ -263,6 +273,20 @@ private struct MessageBubbleDemoView: View {
     .contentShape(Rectangle())
     .onTapGesture {
       if let side = position.side { corner = side }
+    }
+  }
+
+  private var currentBorder: MessageBubbleBorder {
+    switch borderStyle {
+    case .none:
+      .none
+    case .solid:
+      .solid(color: .secondary.opacity(0.35), lineWidth: 1)
+    case .dashed:
+      .dashed(
+        configuration: .init(lineWidth: 2, dashLength: 8, dashSpacing: 4, cornerRadius: 1),
+        fill: .color(.purple)
+      )
     }
   }
 
@@ -344,6 +368,21 @@ private enum CornerPosition: String, CaseIterable, Identifiable {
     case .bottomLeading: .left
     case .bottomTrailing: .right
     default: nil
+    }
+  }
+}
+
+private enum BorderStyle: String, CaseIterable, Identifiable {
+  case none
+  case solid
+  case dashed
+
+  var id: String { rawValue }
+  var title: String {
+    switch self {
+    case .none: "None"
+    case .solid: "Solid"
+    case .dashed: "Dashed"
     }
   }
 }

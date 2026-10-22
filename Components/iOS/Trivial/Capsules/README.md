@@ -1,13 +1,13 @@
 # Capsules
 
-`CapsuleButton` is a borderless, accessible text action using a continuous `RoundedRectangle`, not SwiftUI's fixed `Capsule` shape.
+`CapsuleButton` is a borderless, accessible text action using a continuous rounded rectangle. Its width follows its text, font, and horizontal padding; it does not impose a fixed width.
 
 ```swift
 CapsuleButton(
     "Good morning",
     background: .gray.opacity(0.12),
     foreground: .primary,
-    cornerRadius: 16
+    cornerRadius: 18
 ) {
     // Handle selection
 }

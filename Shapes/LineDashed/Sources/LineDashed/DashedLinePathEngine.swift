@@ -8,6 +8,7 @@ struct DashedLineSegment: Sendable, Equatable {
     var width: CGFloat
     var cornerRadius: CGFloat
     var distance: CGFloat
+    var pathPoints: [CGPoint]
 }
 
 struct DashedLinePathEngine {
@@ -18,8 +19,8 @@ struct DashedLinePathEngine {
 
     private let tolerance: CGFloat
 
-    init(tolerance: CGFloat = 0.5) {
-        self.tolerance = max(0.05, tolerance.isFinite ? tolerance : 0.5)
+    init(tolerance: CGFloat = 0.1) {
+        self.tolerance = max(0.05, tolerance.isFinite ? tolerance : 0.1)
     }
 
     func segments(path: Path, configuration: DashedLineConfiguration, phase: CGFloat = 0) -> [DashedLineSegment] {
@@ -55,7 +56,22 @@ struct DashedLinePathEngine {
                 let angle = atan2(after.y - before.y, after.x - before.x)
                 let length = segmentEnd - segmentStart
                 if length.isFinite, length > 0, angle.isFinite {
-                    result.append(.init(center: middle, angle: angle, length: length, width: configuration.lineWidth, cornerRadius: min(configuration.cornerRadius, min(length, configuration.lineWidth) / 2), distance: segmentStart))
+                    // Keep the original path curvature inside each dash instead of replacing
+                    // every dash with a rotated straight rectangle.
+                    var dashPoints = [a]
+                    var low = 0
+                    var high = samples.count
+                    while low < high {
+                        let mid = (low + high) / 2
+                        if samples[mid].distance <= segmentStart { low = mid + 1 } else { high = mid }
+                    }
+                    var index = low
+                    while index < samples.count, samples[index].distance < segmentEnd {
+                        dashPoints.append(samples[index].point)
+                        index += 1
+                    }
+                    if dashPoints.last != b { dashPoints.append(b) }
+                    result.append(.init(center: middle, angle: angle, length: length, width: configuration.lineWidth, cornerRadius: min(configuration.cornerRadius, min(length, configuration.lineWidth) / 2), distance: segmentStart, pathPoints: dashPoints))
                 }
             }
             start += actualPeriod
