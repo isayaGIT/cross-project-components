@@ -18,6 +18,60 @@ public enum TreeMovePlacement: Equatable, Sendable {
     case after
 }
 
+/// Pointer gesture family considered by the TreeView gesture-layer resolver.
+public enum TreeGestureKind: Equatable, Sendable {
+    case primaryPointer
+    case secondaryPointer
+    case otherPointer
+}
+
+/// Immutable, host-independent context used to decide which gesture layer owns a pointer sequence.
+/// `point` uses top-leading row-content coordinates, matching the row layout API.
+public struct TreeGestureHitTestContext {
+    public let nodeID: AnyHashable
+    public let point: CGPoint
+    public let size: CGSize
+    public let kind: TreeGestureKind
+    public let clickCount: Int
+    public let modifierFlags: UInt
+
+    public init(nodeID: AnyHashable, point: CGPoint, size: CGSize, kind: TreeGestureKind, clickCount: Int = 1, modifierFlags: UInt = 0) {
+        self.nodeID = nodeID
+        self.point = point
+        self.size = size
+        self.kind = kind
+        self.clickCount = clickCount
+        self.modifierFlags = modifierFlags
+    }
+}
+
+/// The delivery path selected by gesture arbitration.
+public enum TreeGestureRoute: Equatable, Sendable {
+    /// Deliver the sequence to the row's hosted SwiftUI/AppKit content.
+    case embeddedView
+    /// Keep the sequence in the native NSOutlineView event path.
+    case treeNative
+}
+
+/// A host-defined gesture layer. Higher priorities are resolved first; registration order breaks ties.
+/// Existing layers can keep implementing `claims(_:)`; its default resolution routes claimed input
+/// to the embedded row view. A layer may override `resolution(for:)` to select the native Tree route.
+public protocol TreeGestureLayer {
+    var priority: Int { get }
+    func claims(_ context: TreeGestureHitTestContext) -> Bool
+    func resolution(for context: TreeGestureHitTestContext) -> TreeGestureRoute?
+}
+
+public extension TreeGestureLayer {
+    /// Default for route-first layers that do not use the legacy boolean claim API.
+    func claims(_ context: TreeGestureHitTestContext) -> Bool { false }
+
+    /// Compatibility adapter for existing boolean-claim layers.
+    func resolution(for context: TreeGestureHitTestContext) -> TreeGestureRoute? {
+        claims(context) ? .embeddedView : nil
+    }
+}
+
 /// State supplied to a host-defined row renderer.
 public struct TreeRowContext<Node> {
     public let node: Node
@@ -28,8 +82,9 @@ public struct TreeRowContext<Node> {
     public let isEditing: Bool
     public let onRename: (String) -> Void
     public let onCommitEditing: (String) -> Void
+    public let shouldFinishEditingOnFocusLoss: () -> Bool
 
-    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onCommitEditing: @escaping (String) -> Void = { _ in }) {
+    public init(node: Node, depth: Int, isSelected: Bool, isExpanded: Bool, hasChildren: Bool, isEditing: Bool = false, onRename: @escaping (String) -> Void = { _ in }, onCommitEditing: @escaping (String) -> Void = { _ in }, shouldFinishEditingOnFocusLoss: @escaping () -> Bool = { true }) {
         self.node = node
         self.depth = depth
         self.isSelected = isSelected
@@ -38,6 +93,24 @@ public struct TreeRowContext<Node> {
         self.isEditing = isEditing
         self.onRename = onRename
         self.onCommitEditing = onCommitEditing
+        self.shouldFinishEditingOnFocusLoss = shouldFinishEditingOnFocusLoss
+    }
+}
+
+private final class TreePointerInteractionTracker {
+    private var hasRecentInputTarget = false
+    private var targetRowID: AnyHashable?
+
+    func recordInputTarget(_ rowID: AnyHashable?) {
+        hasRecentInputTarget = true
+        targetRowID = rowID
+    }
+
+    func shouldFinishEditingOnFocusLoss(for rowID: AnyHashable) -> Bool {
+        guard hasRecentInputTarget else { return true }
+        hasRecentInputTarget = false
+        defer { targetRowID = nil }
+        return targetRowID != rowID
     }
 }
 
@@ -51,6 +124,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     @Binding private var editingID: Node.ID?
     @Binding private var selectedIDs: Set<Node.ID>
     @State private var pendingCreatedPreviousIDs: [Node.ID: Node.ID] = [:]
+    @State private var pointerInteractionTracker = TreePointerInteractionTracker()
     public let searchText: String
     private let searchableText: (Node) -> String
     private let rowHeight: (Node, Int) -> CGFloat
@@ -70,6 +144,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
     private let onRedo: () -> Void
     private let onRowInteraction: (Node.ID) -> Void
     private let interactiveHitTest: (Node, CGPoint, CGSize) -> Bool
+    private let gestureLayers: [any TreeGestureLayer]
     private let rowContent: (TreeRowContext<Node>) -> RowContent
 
     public init(
@@ -97,6 +172,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         onRedo: @escaping () -> Void = {},
         onRowInteraction: @escaping (Node.ID) -> Void = { _ in },
         interactiveHitTest: @escaping (Node, CGPoint, CGSize) -> Bool = { _, _, _ in false },
+        gestureLayers: [any TreeGestureLayer] = [],
         @ViewBuilder rowContent: @escaping (TreeRowContext<Node>) -> RowContent
     ) {
         self.root = root
@@ -123,6 +199,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
         self.onRedo = onRedo
         self.onRowInteraction = onRowInteraction
         self.interactiveHitTest = interactiveHitTest
+        self.gestureLayers = gestureLayers
         self.rowContent = rowContent
     }
 
@@ -152,6 +229,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
             },
+            onPointerInteraction: { id in pointerInteractionTracker.recordInputTarget(id) },
             onBeginEditing: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.selection = typedID
@@ -187,6 +265,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 guard let typedID = id.base as? Node.ID else { return }
                 self.onRowInteraction(typedID)
             },
+            onPointerInteraction: { id in pointerInteractionTracker.recordInputTarget(id) },
             onBeginEditing: { id in
                 guard let typedID = id.base as? Node.ID else { return }
                 self.selection = typedID
@@ -301,6 +380,9 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                         pendingCreatedPreviousIDs.removeValue(forKey: node.treeID)
                     }
                     if editingID == node.treeID { editingID = nil }
+                },
+                shouldFinishEditingOnFocusLoss: {
+                    pointerInteractionTracker.shouldFinishEditingOnFocusLoss(for: AnyHashable(node.treeID))
                 }
             )
             return TreeNodeSnapshot(
@@ -312,6 +394,7 @@ public struct TreeView<Node: TreeNodeRepresentable, RowContent: View>: NSViewCon
                 disclosureCenterOffset: disclosureCenterOffset?(node, depth) ?? computedRowHeight / 2,
                 content: AnyView(rowContent(context)),
                 interactiveHitTest: { point, size in interactiveHitTest(node, point, size) },
+                gestureLayers: gestureLayers,
                 children: children,
                 contentCount: max(0, contentCount(node))
             )
