@@ -5,7 +5,7 @@ public struct ImgPolaroidShowcase: View {
     @State private var offset = CGSize.zero
     @State private var selected = false
     @State private var rotation = -5.0
-    @State private var status = "Hold to lift · drag corners to rotate"
+    @State private var status = "Hold to lift · drag a top corner to rotate"
 
     public init() {}
 

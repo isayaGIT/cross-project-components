@@ -1,74 +1,71 @@
 # MessageBubble
 
-A small, native SwiftUI building block for chat message bubbles. It draws the bubble as one continuous shape with a configurable square corner; it does **not** append a separate triangle or tail.
+A native SwiftUI primitive for chat bubbles. One public view supports two silhouettes and optional timestamp metadata while keeping message models, sender grouping, and time formatting in the host app.
 
-## Scope
+## Responsibilities
 
-- `MessageBubbleShape` owns only bubble geometry and can be used independently with SwiftUI shape APIs.
-- `MessageBubble<Content>` adds a fill, configurable content padding, and optional outer width/height around caller-provided SwiftUI content.
-- The host app owns message data, sender layout, typography, accessibility labels for message content, delivery state, animations, shadows, borders, and interaction behavior.
-- No chat timeline, message model, networking, theme engine, effect framework, or third-party dependency is included.
+- `MessageBubbleShape` owns the bubble outline and can be used directly with standard SwiftUI shape APIs.
+- `MessageBubbleStyle.tailLess` preserves the original single-shape silhouette with a configurable square corner.
+- `MessageBubbleStyle.roundedTail` draws a rounded bubble with an integrated lower-leading or lower-trailing tail in the same path. It does not layer a separate triangle over a rounded rectangle.
+- `MessageBubble<Content>` owns fill, content insets, optional dimensions, and optional timestamp presentation outside the bubble.
+- The host app owns message data, sender alignment in the conversation, grouping rules, timestamp formatting/localization, delivery state, and interactions.
+
+No chat timeline, networking, message model, theme engine, effect registry, or third-party dependency is included.
 
 ## Requirements
 
-Swift 5.9+, iOS 17+ (the package's existing iOS deployment target). The component uses `UnevenRoundedRectangle` with continuous corners.
+Swift 5.9+, iOS 17+ (the package's existing deployment target).
 
 ## Usage
 
 ```swift
 import SwiftUI
 
-struct ExampleMessage: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            MessageBubble(sharpCorner: .bottomLeading, fill: Color.gray.opacity(0.16)) {
-                Text("An incoming message")
-                    .font(.custom("YourAppFont-Medium", size: 16))
-                    .foregroundStyle(.primary)
-            }
+MessageBubble(
+    sharpCorner: .bottomLeading,
+    style: .roundedTail,
+    fill: Color.gray.opacity(0.16),
+    timestamp: "16:08",
+    metadataAlignment: .leading
+) {
+    Text("An incoming message")
+        .foregroundStyle(.primary)
+}
 
-            MessageBubble(
-                cornerRadius: 20,
-                sharpCorner: .bottomTrailing,
-                fill: LinearGradient(
-                    colors: [.blue, .cyan],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            ) {
-                Text("An outgoing message")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-        }
-    }
+MessageBubble(
+    sharpCorner: .bottomTrailing,
+    style: .tailLess,
+    fill: LinearGradient(
+        colors: [.blue, .cyan],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    ),
+    timestamp: "16:09",
+    metadataAlignment: .trailing
+) {
+    Text("An outgoing message")
+        .foregroundStyle(.white)
 }
 ```
 
-For a shape-only use case:
+The timestamp is optional. `nil` and an empty string both omit it without reserving space. Supply an already formatted string so the component stays independent of locale, time zone, and the app's message model. Set `metadataAlignment` to `.leading` for incoming messages and `.trailing` for outgoing messages.
+
+For shape-only use:
 
 ```swift
-MessageBubbleShape(cornerRadius: 18, sharpCorner: .bottomTrailing)
-    .fill(.blue)
-    .frame(width: 220, height: 84)
+MessageBubbleShape(
+    cornerRadius: 18,
+    sharpCorner: .bottomTrailing,
+    style: .roundedTail
+)
+.fill(.blue)
+.frame(width: 220, height: 84)
 ```
 
-## Public API
+## API decisions
 
-| API | Behavior |
-| --- | --- |
-| `MessageBubbleShape(cornerRadius:sharpCorner:)` | Reusable geometry with a non-negative radius; oversized radii are clamped to the shape's bounds. |
-| `SharpCorner.none` | All four corners use the configured radius. |
-| `SharpCorner.topLeading`, `.topTrailing`, `.bottomLeading`, `.bottomTrailing` | The selected corner is square; the other three remain rounded. Leading/trailing follow SwiftUI's layout direction. |
-| `MessageBubble(..., fill: ...)` | Accepts any `ShapeStyle`, including `Color`, material-compatible styles, and gradients. |
-| `padding`, `width`, `height`, `alignment` | Control content inset and optional bubble dimensions. `nil` dimensions preserve content-driven sizing. |
-| Content closure | Accepts any SwiftUI view. Set fonts, text colors, accessibility behavior, and content-specific styling on the content itself. |
-
-## Design decisions
-
-- **No appended tail:** the silhouette is a single path, so the square corner is part of the bubble itself.
-- **Shape and view are separate:** geometry is independently reusable and can be tested without coupling it to text or message state.
-- **SwiftUI-native customization:** font, shadow, stroke, animation, and other effects remain standard view modifiers. This avoids an effect registry or a parallel styling abstraction.
-- **No global design-token dependency:** a reusable primitive should not silently impose one app's palette or typography. The default fill uses `Color.accentColor`; consumers can supply their own style.
-- **No hard-coded text layout:** the component accepts arbitrary content, and custom fonts remain the host app's responsibility.
+- One `MessageBubble` API; silhouette is selected through `MessageBubbleStyle` rather than parallel bubble types.
+- The tail is part of a single path, so fill and stroke follow one continuous outline.
+- Only lower-leading and lower-trailing corners produce a tail. If another corner is selected with `.roundedTail`, the shape safely falls back to the tail-less geometry.
+- Timestamp is rendered outside the shape and only when non-empty. It is presentation metadata, not part of the content closure or shape geometry.
+- Fonts, colors, effects, accessibility for message content, and sender layout remain customizable through SwiftUI and the host app.

@@ -1,0 +1,24 @@
+name: ImgViewShowcaseApp
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  ImgView:
+    path: ../..
+targets:
+  ImgViewShowcaseApp:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: ImgView
+        product: ImgView
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.ImgViewShowcaseApp
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES

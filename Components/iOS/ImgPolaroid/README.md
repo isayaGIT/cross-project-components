@@ -7,8 +7,8 @@ A lightweight SwiftUI component for rendering and interacting with **one Polaroi
 - Tap to toggle the raised/selected state.
 - Press and hold briefly to raise/select the card without moving it.
 - Drag the card to move it with immediate pointer tracking and a stable release.
-- Drag directly from either top corner to rotate the card. No rotation buttons or handles are shown.
-- Rotation follows the finger’s angular movement around the card center; both corners use the same geometry with mirrored direction handling rather than a fixed pixels-to-degrees multiplier.
+- Drag from a top corner to rotate the card. No rotation buttons or visible handles are shown.
+- During corner rotation, the component derives angle from the finger’s angular movement around a fixed gesture pivot, then preserves the exact grabbed point under the finger while solving the card position. The initial touch never snaps the card to a different point. There are no angle-specific thresholds or pixels-to-degrees multipliers.
 - Optional callbacks report drag state and interactive rotation.
 
 ## Usage

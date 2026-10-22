@@ -1,0 +1,327 @@
+import CrossProjectComponentsIOS
+import SwiftUI
+
+@main
+struct MessageBubbleDemoApp: App {
+  var body: some Scene {
+    WindowGroup {
+      MessageBubbleDemoView()
+    }
+  }
+}
+
+private struct MessageBubbleDemoView: View {
+  @State private var corner: CornerSide = .right
+  @State private var radius = 20.0
+  @State private var useGradient = true
+  @State private var showGallery = true
+  @State private var useTail = false
+  @State private var showTimestamp = true
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 24) {
+          introduction
+          controls
+          conversation
+          if showGallery { geometryGallery }
+        }
+        .padding(20)
+        .frame(maxWidth: 620, alignment: .leading)
+        .frame(maxWidth: .infinity)
+      }
+      .background(Color(uiColor: .systemGroupedBackground))
+      .navigationTitle("MessageBubble")
+      .navigationBarTitleDisplayMode(.inline)
+    }
+  }
+
+  private var introduction: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Image(systemName: "bubble.left.and.bubble.right.fill")
+          .font(.title2)
+          .foregroundStyle(.tint)
+        Text("Native SwiftUI component")
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
+      Text("One component. Two silhouettes.")
+        .font(.system(size: 29, weight: .bold, design: .rounded))
+        .tracking(-0.7)
+      Text("Switch between a clean square corner and a continuous rounded tail. Optional timestamps sit outside the bubble.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var controls: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Label("Bottom corner", systemImage: "arrow.turn.down.right")
+          .font(.subheadline.weight(.semibold))
+        Spacer()
+        Picker("Corner", selection: $corner) {
+          ForEach(CornerSide.allCases) { side in
+            Text(side.title).tag(side)
+          }
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 150)
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text("Corner radius")
+          Spacer()
+          Text("\(Int(radius)) pt")
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        }
+        Slider(value: $radius, in: 8...32, step: 1)
+          .tint(.accentColor)
+      }
+
+      Picker("Bubble style", selection: $useTail) {
+        Text("Tail-less").tag(false)
+        Text("Rounded tail").tag(true)
+      }
+      .pickerStyle(.segmented)
+
+      Toggle(isOn: $showTimestamp) {
+        Label("Show external timestamps", systemImage: "clock")
+      }
+      .font(.subheadline)
+
+      Toggle(isOn: $useGradient) {
+        Label("Gradient fill", systemImage: "paintpalette")
+      }
+      .font(.subheadline)
+
+      Toggle(isOn: $showGallery) {
+        Label("Show all corner positions", systemImage: "square.on.circle")
+      }
+      .font(.subheadline)
+    }
+    .padding(16)
+    .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 20, style: .continuous)
+        .strokeBorder(.quaternary, lineWidth: 1)
+    }
+  }
+
+  private var conversation: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      sectionHeader("LIVE PREVIEW", detail: "Changes apply instantly")
+
+      HStack(alignment: .bottom, spacing: 10) {
+        avatar("M", color: .purple)
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Morgan")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+          MessageBubble(
+            cornerRadius: radius,
+            sharpCorner: .bottomLeading,
+            style: useTail ? .roundedTail : .tailLess,
+            fill: Color(uiColor: .secondarySystemGroupedBackground),
+            timestamp: showTimestamp ? "16:08" : nil,
+            metadataAlignment: .leading,
+            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14)
+          ) {
+            Text(
+              "Hey! This is the incoming bubble. Notice the bottom-left corner is perfectly square."
+            )
+            .font(.system(size: 16))
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+          }
+          .overlay {
+            MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading)
+              .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
+          }
+        }
+        Spacer(minLength: 16)
+      }
+
+      HStack(alignment: .bottom, spacing: 10) {
+        Spacer(minLength: 40)
+        VStack(alignment: .trailing, spacing: 4) {
+          Text("You · 9:41 AM")
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+          MessageBubble(
+            cornerRadius: radius,
+            sharpCorner: corner.sharpCorner,
+            style: useTail ? .roundedTail : .tailLess,
+            fill: bubbleFill,
+            timestamp: showTimestamp ? "16:09" : nil,
+            metadataAlignment: .trailing,
+            padding: EdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14)
+          ) {
+            Text("And this is the outgoing message. Drag the controls above to explore the shape.")
+              .font(.system(size: 16))
+              .foregroundStyle(.white)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          .shadow(color: .blue.opacity(0.16), radius: 9, y: 3)
+        }
+        avatar("Z", color: .blue)
+      }
+
+      HStack(alignment: .bottom, spacing: 10) {
+        avatar("M", color: .purple)
+        MessageBubble(
+          cornerRadius: radius,
+          sharpCorner: .bottomLeading,
+          fill: Color(uiColor: .secondarySystemGroupedBackground)
+        ) {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Long content stays content-driven")
+              .font(.system(size: 15, weight: .semibold))
+            Text(
+              "A reusable bubble should handle multiple lines naturally without knowing anything about messages, senders, or chat state."
+            )
+            .font(.system(size: 15))
+            .foregroundStyle(.secondary)
+          }
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        .overlay {
+          MessageBubbleShape(cornerRadius: radius, sharpCorner: .bottomLeading)
+            .stroke(Color.secondary.opacity(0.24), lineWidth: 0.8)
+        }
+        Spacer(minLength: 26)
+      }
+    }
+  }
+
+  private var geometryGallery: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      sectionHeader("SHAPE GALLERY", detail: "All four supported corner positions")
+      LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        ForEach(CornerPosition.allCases) { position in
+          galleryItem(position)
+        }
+      }
+    }
+  }
+
+  private func galleryItem(_ position: CornerPosition) -> some View {
+    let isSelected = position == corner.position
+    let fill: AnyShapeStyle =
+      isSelected
+      ? bubbleFill
+      : AnyShapeStyle(Color(uiColor: .tertiarySystemFill))
+    let outline = isSelected ? Color.blue.opacity(0.45) : Color.secondary.opacity(0.12)
+
+    return VStack(alignment: .leading, spacing: 10) {
+      MessageBubbleShape(cornerRadius: radius, sharpCorner: position.sharpCorner)
+        .fill(fill)
+        .frame(height: 74)
+        .overlay {
+          MessageBubbleShape(cornerRadius: radius, sharpCorner: position.sharpCorner)
+            .stroke(outline, lineWidth: 1)
+        }
+      HStack {
+        Text(position.title)
+          .font(.subheadline.weight(.medium))
+        Spacer()
+        if isSelected {
+          Image(systemName: "checkmark.circle.fill")
+            .foregroundStyle(.blue)
+        }
+      }
+    }
+    .padding(12)
+    .background(.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .contentShape(Rectangle())
+    .onTapGesture {
+      if let side = position.side { corner = side }
+    }
+  }
+
+  private var bubbleFill: AnyShapeStyle {
+    if useGradient {
+      AnyShapeStyle(
+        LinearGradient(
+          colors: [
+            Color(red: 0.16, green: 0.48, blue: 0.96), Color(red: 0.29, green: 0.36, blue: 0.91),
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        ))
+    } else {
+      AnyShapeStyle(Color.accentColor)
+    }
+  }
+
+  private func avatar(_ letter: String, color: Color) -> some View {
+    Text(letter)
+      .font(.system(size: 13, weight: .bold))
+      .foregroundStyle(.white)
+      .frame(width: 30, height: 30)
+      .background(color.gradient, in: Circle())
+  }
+
+  private func sectionHeader(_ title: String, detail: String) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text(title)
+        .font(.caption.weight(.bold))
+        .tracking(1.1)
+        .foregroundStyle(.secondary)
+      Text(detail)
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+private enum CornerSide: String, CaseIterable, Identifiable {
+  case left
+  case right
+
+  var id: String { rawValue }
+  var title: String { self == .left ? "Left" : "Right" }
+  var sharpCorner: MessageBubbleShape.SharpCorner {
+    self == .left ? .bottomLeading : .bottomTrailing
+  }
+  var position: CornerPosition { self == .left ? .bottomLeading : .bottomTrailing }
+}
+
+private enum CornerPosition: String, CaseIterable, Identifiable {
+  case topLeading
+  case topTrailing
+  case bottomLeading
+  case bottomTrailing
+
+  var id: String { rawValue }
+  var title: String {
+    switch self {
+    case .topLeading: "Top left"
+    case .topTrailing: "Top right"
+    case .bottomLeading: "Bottom left"
+    case .bottomTrailing: "Bottom right"
+    }
+  }
+
+  var sharpCorner: MessageBubbleShape.SharpCorner {
+    switch self {
+    case .topLeading: .topLeading
+    case .topTrailing: .topTrailing
+    case .bottomLeading: .bottomLeading
+    case .bottomTrailing: .bottomTrailing
+    }
+  }
+
+  var side: CornerSide? {
+    switch self {
+    case .bottomLeading: .left
+    case .bottomTrailing: .right
+    default: nil
+    }
+  }
+}

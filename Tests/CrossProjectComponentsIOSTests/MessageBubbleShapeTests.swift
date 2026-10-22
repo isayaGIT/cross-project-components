@@ -45,6 +45,43 @@ final class MessageBubbleShapeTests: XCTestCase {
         XCTAssertTrue(path.contains(CGPoint(x: 50, y: 30)))
     }
 
+    func testRoundedTailExtendsToLeadingAndTrailingEdges() {
+        let leading = MessageBubbleShape(
+            cornerRadius: 16, sharpCorner: .bottomLeading, style: .roundedTail
+        ).path(in: bounds)
+        let trailing = MessageBubbleShape(
+            cornerRadius: 16, sharpCorner: .bottomTrailing, style: .roundedTail
+        ).path(in: bounds)
+
+        XCTAssertTrue(leading.contains(CGPoint(x: 13, y: 59)))
+        XCTAssertTrue(trailing.contains(CGPoint(x: 87, y: 59)))
+        XCTAssertFalse(leading.contains(CGPoint(x: 87, y: 59)))
+        XCTAssertFalse(trailing.contains(CGPoint(x: 13, y: 59)))
+    }
+
+    func testRoundedTailFallsBackForUnsupportedCorner() {
+        let actual = MessageBubbleShape(
+            cornerRadius: 16, sharpCorner: .topLeading, style: .roundedTail
+        ).path(in: bounds)
+        let expected = MessageBubbleShape(
+            cornerRadius: 16, sharpCorner: .topLeading, style: .tailLess
+        ).path(in: bounds)
+
+        XCTAssertEqual(actual.boundingRect, expected.boundingRect)
+    }
+
+    func testTailLessStylePreservesExistingShapeGeometry() {
+        let actual = MessageBubbleShape(
+            cornerRadius: 18, sharpCorner: .bottomTrailing, style: .tailLess
+        ).path(in: bounds)
+        let expected = MessageBubbleShape(
+            cornerRadius: 18, sharpCorner: .bottomTrailing
+        ).path(in: bounds)
+
+        XCTAssertEqual(actual.boundingRect, expected.boundingRect)
+        XCTAssertTrue(actual.contains(CGPoint(x: 99, y: 59)))
+    }
+
     func testMutatingRadiusCannotMakeItNegative() {
         var shape = MessageBubbleShape(cornerRadius: 12)
         shape.cornerRadius = -8

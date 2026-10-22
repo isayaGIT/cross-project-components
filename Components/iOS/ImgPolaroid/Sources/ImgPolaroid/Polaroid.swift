@@ -23,9 +23,10 @@ public struct Polaroid: View {
     @State private var localRotation: Double = 0
     @State private var dragTranslation: CGSize = .zero
     @State private var dragStartPosition: CGSize = .zero
-    @State private var gestureStartRotation: Double = 0
+    @State private var rotationStartAngle: Double = 0
+    @State private var rotationStartPointerAngle: Double = 0
     @State private var cardCenterInGlobal = CGPoint.zero
-    @State private var rotationStartTouch = CGPoint.zero
+    @State private var rotationPivotCenter = CGPoint.zero
     @State private var isDragging = false
     @State private var moveGestureStarted = false
     @State private var rotationGestureStarted = false
@@ -91,6 +92,20 @@ public struct Polaroid: View {
     public var body: some View {
         card
             .frame(width: width, height: cardHeight)
+            .overlay(alignment: .topLeading) {
+                if isDraggable { rotationHitTarget(isLeading: true) }
+            }
+            .overlay(alignment: .topTrailing) {
+                if isDraggable { rotationHitTarget(isLeading: false) }
+            }
+            .contentShape(Rectangle())
+            .rotationEffect(.degrees(displayedRotation))
+            // Keep the rotation geometry rigid: scaling during a corner drag would
+            // move the corner away from the finger while the angle is being updated.
+            .scaleEffect(!rotationGestureStarted && (isRaised || isDragging) ? 1.035 : 1)
+            .offset(x: position.width + dragTranslation.width, y: position.height + dragTranslation.height)
+            // Measure after all geometric transforms so the gesture uses the actual
+            // rendered center, not the pre-offset layout frame.
             .background {
                 GeometryReader { geometry in
                     let frame = geometry.frame(in: .global)
@@ -101,18 +116,6 @@ public struct Polaroid: View {
                 }
             }
             .onPreferenceChange(PolaroidGlobalCenterPreferenceKey.self) { cardCenterInGlobal = $0 }
-            .overlay(alignment: .topLeading) {
-                if isDraggable { rotationHitTarget(direction: .leftCorner) }
-            }
-            .overlay(alignment: .topTrailing) {
-                if isDraggable { rotationHitTarget(direction: .rightCorner) }
-            }
-            .contentShape(Rectangle())
-            .simultaneousGesture(longPressGesture)
-            .gesture(isDraggable ? moveGesture : nil)
-            .rotationEffect(.degrees(displayedRotation))
-            .scaleEffect(isRaised || isDragging ? 1.035 : 1)
-            .offset(x: position.width + dragTranslation.width, y: position.height + dragTranslation.height)
             .shadow(
                 color: .black.opacity(showsShadow ? (isRaised || isDragging ? 0.22 : 0.12) : 0),
                 radius: isDragging ? 18 : (isRaised ? 13 : 6),
@@ -157,18 +160,20 @@ public struct Polaroid: View {
         .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 3, style: .continuous).stroke(Color(red: 0.48, green: 0.43, blue: 0.35).opacity(0.13), lineWidth: 0.65) }
         .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.58)).frame(height: 0.8).padding(.horizontal, 3) }
+        // Movement and long-press live on the card surface, beneath the corner overlays.
+        // A corner overlay's high-priority rotation gesture therefore owns that touch.
+        .simultaneousGesture(longPressGesture)
+        .gesture(isDraggable ? moveGesture : nil)
     }
 
-    /// A real, invisible hit target that rotates with the card. Rotation no longer
-    /// depends on classifying a global touch point against a reconstructed card frame.
-    /// Both corners share the same polar-angle calculation. Mirroring the horizontal
-    /// axis lets one direction parameter express their opposite rotation directions.
-    private func rotationHitTarget(direction: PolaroidRotationDirection) -> some View {
+    /// The hit region starts rotation; the gesture then tracks globally and no longer
+    /// depends on the moving corner remaining beneath the original hit region.
+    private func rotationHitTarget(isLeading: Bool) -> some View {
         Rectangle()
             .fill(.clear)
             .frame(width: cornerHitSize, height: cornerHitSize)
             .contentShape(Rectangle())
-            .highPriorityGesture(rotationGesture(direction: direction))
+            .highPriorityGesture(rotationGesture(isLeading: isLeading))
             .accessibilityHidden(true)
     }
 
@@ -227,29 +232,51 @@ public struct Polaroid: View {
             }
     }
 
-    private func rotationGesture(direction: PolaroidRotationDirection) -> some Gesture {
+    private func rotationGesture(isLeading: Bool) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
                 if !rotationGestureStarted {
+                    // Snapshot the rendered card center and pointer vector once. The
+                    // rotation is derived from the change in polar angle around this
+                    // fixed pivot; the card's position is never part of this calculation.
                     rotationGestureStarted = true
-                    gestureStartRotation = displayedRotation
-                    rotationStartTouch = value.startLocation
+                    rotationStartAngle = displayedRotation
+                    rotationPivotCenter = cardCenterInGlobal
+                    rotationStartPointerAngle = PolaroidRotationMath.polarAngle(
+                        point: value.startLocation,
+                        center: rotationPivotCenter
+                    )
                     longPressRecognized = false
+                    moveGestureStarted = false
+                    dragTranslation = .zero
                     isDragging = true
                     onDragStateChange?(true)
+                    return
                 }
-                let angle = PolaroidRotationMath.angle(
-                    startingAt: gestureStartRotation,
-                    startPoint: rotationStartTouch,
-                    currentPoint: value.location,
-                    center: cardCenterInGlobal,
-                    direction: direction
+
+                let pointerAngle = PolaroidRotationMath.polarAngle(
+                    point: value.location,
+                    center: rotationPivotCenter
                 )
-                setRotation(angle)
+                let angularDelta = PolaroidRotationMath.shortestAngularDelta(
+                    from: rotationStartPointerAngle,
+                    to: pointerAngle
+                )
+                // The leading (top-left) handle has the opposite drag convention in
+                // this interaction, so invert only its angular delta. The pivot and
+                // position remain unchanged; the trailing handle keeps the normal sign.
+                let angle = rotationStartAngle + (isLeading ? -angularDelta : angularDelta)
+
+                var transaction = Transaction()
+                transaction.animation = nil
+                withTransaction(transaction) {
+                    setRotation(angle)
+                }
                 onRotationChange?(angle)
             }
             .onEnded { _ in
                 rotationGestureStarted = false
+                moveGestureStarted = false
                 finishDrag()
                 setRaised(false)
             }
@@ -271,29 +298,17 @@ private struct PolaroidGlobalCenterPreferenceKey: PreferenceKey {
     }
 }
 
-/// The two handles share one rotation algorithm but mirror its horizontal reference axis.
-enum PolaroidRotationDirection: Double {
-    case leftCorner = -1
-    case rightCorner = 1
-}
-
-/// Converts the finger's angular movement around the card center into card rotation.
+/// Angle tracking for rotation around the Polaroid card center. The pivot stays fixed;
+/// rotating never writes to the card position.
 enum PolaroidRotationMath {
-    static func angle(
-        startingAt start: Double,
-        startPoint: CGPoint,
-        currentPoint: CGPoint,
-        center: CGPoint,
-        direction: PolaroidRotationDirection
-    ) -> Double {
-        let startAngle = polarAngle(point: startPoint, center: center)
-        let currentAngle = polarAngle(point: currentPoint, center: center)
-        let rawDelta = currentAngle - startAngle
-        let delta = atan2(sin(rawDelta), cos(rawDelta))
-        return start + delta * direction.rawValue * 180 / .pi
+    /// Returns the pointer's polar angle around the card center, in degrees.
+    static func polarAngle(point: CGPoint, center: CGPoint) -> Double {
+        atan2(point.y - center.y, point.x - center.x)
     }
 
-    private static func polarAngle(point: CGPoint, center: CGPoint) -> Double {
-        atan2(point.y - center.y, point.x - center.x)
+    /// Smallest signed angular difference from the initial pointer ray to the current
+    /// ray. This prevents a discontinuity when crossing the -π/π boundary.
+    static func shortestAngularDelta(from start: Double, to current: Double) -> Double {
+        atan2(sin(current - start), cos(current - start)) * 180 / .pi
     }
 }

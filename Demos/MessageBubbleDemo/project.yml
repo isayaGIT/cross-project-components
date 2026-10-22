@@ -1,0 +1,30 @@
+name: MessageBubbleDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  CrossProjectComponents:
+    path: ../..
+targets:
+  MessageBubbleDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.messagebubbledemo
+        PRODUCT_NAME: MessageBubbleDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: CrossProjectComponents
+        product: CrossProjectComponentsIOS
+schemes:
+  MessageBubbleDemo:
+    build:
+      targets:
+        MessageBubbleDemo: all
+    run:
+      config: Debug
