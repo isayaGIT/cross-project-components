@@ -1,3 +1,7 @@
 .DS_Store
 .build/
 .swiftpm/
+
+# Local demos and tests
+/demos/
+/tests/
