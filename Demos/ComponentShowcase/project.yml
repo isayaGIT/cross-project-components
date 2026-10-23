@@ -1,0 +1,60 @@
+name: ComponentShowcase
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  Animated:
+    path: ../../Components/iOS/Animated
+targets:
+  ComponentShowcase:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: ../../Components/iOS/SwipeActionRow.swift
+        name: SwipeActionRow.swift
+      - path: ../../Components/iOS/MessageListNode/MessageListNode.swift
+        name: MessageListNode.swift
+      - path: ../../Class/Background/Background.swift
+        name: Background.swift
+      - path: ../../Class/Background/ColorCustom.swift
+        name: ColorCustom.swift
+      - path: ../../Components/iOS/Avatar/Sources/Avatar/Avatar.swift
+        name: Avatar.swift
+      - path: ../../Components/iOS/Trivial/UnreadBadge/UnreadBadge.swift
+        name: UnreadBadge.swift
+      - path: ../../Components/iOS/FollowScrollView.swift
+        name: FollowScrollView.swift
+      - path: ../../Components/iOS/VoiceMessage/VoiceMessage.swift
+        name: VoiceMessage.swift
+      - path: ../../Components/iOS/Trivial/NoticeStack/NoticeStack.swift
+        name: NoticeStack.swift
+      - path: ../../Components/iOS/VoiceMessage/WaveformScrub.swift
+        name: WaveformScrub.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Lists/SwiftPiecesSwipeActionRow.swift
+        name: SwiftPiecesSwipeActionRow.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Lists/SwiftPiecesFollowScroll.swift
+        name: SwiftPiecesFollowScroll.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Controls/SwiftPiecesElasticButton.swift
+        name: SwiftPiecesElasticButton.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Sheets/SwiftPiecesNoticeStack.swift
+        name: SwiftPiecesNoticeStack.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Feedback/ReactionToggle/ReactionToggle.swift
+        name: ReactionToggle.swift
+    dependencies:
+      - package: Animated
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.componentshowcase
+        PRODUCT_NAME: ComponentShowcase
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+schemes:
+  ComponentShowcase:
+    build:
+      targets:
+        ComponentShowcase: all
+    run:
+      config: Debug

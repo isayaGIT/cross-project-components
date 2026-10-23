@@ -16,3 +16,5 @@
 !/Demos/StickerKeyboardDemo/
 !/Demos/StickerKeyboardDemo/**
 Demos/StickerKeyboardDemo/build/
+!/Demos/ComponentShowcase/
+!/Demos/ComponentShowcase/**

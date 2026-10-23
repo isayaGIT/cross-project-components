@@ -126,7 +126,7 @@ private struct StickerKeyboardDemoView: View {
                 GeometryReader { proxy in
                     StickerSearchSheet(
                     isPresented: $searchPresented,
-                    configuration: .init(sheet: .init(height: .fraction(0.90))),
+                    configuration: .init(sheetPosition: .relative(0.90)),
                     packs: packs,
                     stickers: stickers,
                     assets: Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) }),

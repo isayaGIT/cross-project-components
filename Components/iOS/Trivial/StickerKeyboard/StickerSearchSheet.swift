@@ -1,4 +1,5 @@
 import SwiftUI
+import BottomSheet
 import StickerData
 import NukeUI
 #if canImport(BackgroundData)
@@ -11,7 +12,7 @@ import CrossProjectComponentsIOS
 /// App-wide sticker-pack discovery sheet. Selecting a pack opens its details.
 public struct StickerSearchSheet: View {
     public struct Configuration {
-        public var sheet: SheetCustomConfiguration
+        public var sheetPosition: BottomSheetPosition
         public var titleColor: Color
         public var secondaryTextColor: Color
         public var inputBackground: Color
@@ -19,14 +20,14 @@ public struct StickerSearchSheet: View {
         public var recentSearchLimit: Int
 
         public init(
-            sheet: SheetCustomConfiguration = .init(height: .fraction(0.90)),
+            sheetPosition: BottomSheetPosition = .relative(0.90),
             titleColor: Color = .primary,
             secondaryTextColor: Color = .secondary,
             inputBackground: Color = Color.primary.opacity(0.06),
             placeholder: String = "Search sticker packs",
             recentSearchLimit: Int = 10
         ) {
-            self.sheet = sheet
+            self.sheetPosition = sheetPosition
             self.titleColor = titleColor
             self.secondaryTextColor = secondaryTextColor
             self.inputBackground = inputBackground
@@ -47,6 +48,7 @@ public struct StickerSearchSheet: View {
     private let onInstallPack: (StickerPack) -> Void
     private let onDeletePack: (StickerPack) -> Void
     private let onLikePack: (StickerPack, Bool) -> Void
+    @State private var bottomSheetPosition: BottomSheetPosition = .hidden
     @State private var query = ""
     @State private var randomizedPacks: [StickerPack] = []
     @State private var selectedPackID: String?
@@ -92,13 +94,26 @@ public struct StickerSearchSheet: View {
         ZStack {
             Color.clear
             if isPresented {
-                SheetCustom(isPresented: $isPresented, configuration: configuration.sheet) {
-                    searchContent
-                }
-                .onAppear { shufflePacks() }
-                .onChange(of: isPresented) { _, presented in
-                    if presented { shufflePacks() }
-                }
+                Color.clear
+                    .bottomSheet(
+                        bottomSheetPosition: $bottomSheetPosition,
+                        switchablePositions: [.hidden, configuration.sheetPosition],
+                        content: { searchContent }
+                    )
+                    .showDragIndicator(true)
+                    .enableTapToDismiss(true)
+                    .enableSwipeToDismiss(true)
+                    .onAppear {
+                        bottomSheetPosition = configuration.sheetPosition
+                        shufflePacks()
+                    }
+                    .onChange(of: isPresented) { _, presented in
+                        bottomSheetPosition = presented ? configuration.sheetPosition : .hidden
+                        if presented { shufflePacks() }
+                    }
+                    .onChange(of: bottomSheetPosition) { _, position in
+                        isPresented = position != .hidden
+                    }
             }
         }
         // Fill the proposed overlay area so the sheet can size against the host.

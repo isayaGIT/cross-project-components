@@ -116,7 +116,7 @@ struct LiquidGlass {
         backgroundTextureSizeCoefficient: 1,
         backgroundTextureScaleCoefficient: 0.2,
         backgroundTextureBlurRadius: 0.3,
-        tintColor: UIColor { $0.userInterfaceStyle == .dark ? #colorLiteral(red: 0, green: 0.04958364581, blue: 0.09951775161, alpha: 0.7981493615) : #colorLiteral(red: 0.9023525731, green: 0.9509486998, blue: 1, alpha: 0.8002892298) }//.systemBackground.withAlphaComponent(0.8),
+        // Keep the glass untinted so its appearance follows the content behind it.
     )
 }
 

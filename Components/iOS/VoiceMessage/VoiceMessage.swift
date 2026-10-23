@@ -24,6 +24,8 @@ public struct VoiceMessageView: View {
     private let width: CGFloat?
 
     @StateObject private var playback: VoiceMessagePlaybackController
+    @State private var samples: [Float] = []
+    @State private var playbackRate: Double = 1
 
     /// Creates a voice message player.
     /// - Parameters:
@@ -71,6 +73,7 @@ public struct VoiceMessageView: View {
         }
         .frame(width: width, alignment: .leading)
         .onChange(of: audioURL) { _, newURL in playback.load(url: newURL) }
+        .onChange(of: playbackRate) { _, newRate in playback.setPlaybackRate(newRate) }
         .onDisappear { playback.pause() }
     }
 
@@ -96,58 +99,23 @@ public struct VoiceMessageView: View {
     }
 
     private var waveformPlayer: some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 10) {
-                playButton(size: 32)
-                GeometryReader { geometry in
-                    let bars = normalizedWaveform
-                    let progress = totalDuration > 0 ? min(1, max(0, playback.currentTime / totalDuration)) : 0
-                    HStack(alignment: .center, spacing: barSpacing(for: geometry.size.width, count: bars.count)) {
-                        ForEach(Array(bars.enumerated()), id: \.offset) { index, value in
-                            Capsule(style: .continuous)
-                                .fill(Double(index) / Double(max(1, bars.count)) < progress ? tint : foreground.opacity(0.28))
-                                .frame(width: barWidth(for: geometry.size.width, count: bars.count), height: barHeight(value))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { gesture in
-                                guard totalDuration > 0, geometry.size.width > 0 else { return }
-                                let fraction = min(1, max(0, gesture.location.x / geometry.size.width))
-                                playback.seek(to: totalDuration * fraction, durationLimit: totalDuration)
-                            }
-                    )
-                    .accessibilityElement()
-                    .accessibilityLabel("Audio waveform")
-                    .accessibilityValue("\(formattedTime(playback.currentTime)) of \(formattedTime(totalDuration))")
-                    .accessibilityAdjustableAction { direction in
-                        guard totalDuration > 0 else { return }
-                        let delta = max(1, totalDuration * 0.05)
-                        switch direction {
-                        case .increment: playback.seek(to: playback.currentTime + delta, durationLimit: totalDuration)
-                        case .decrement: playback.seek(to: playback.currentTime - delta, durationLimit: totalDuration)
-                        @unknown default: break
-                        }
-                    }
-                }
-                .frame(height: 38)
-            }
-
-            HStack {
-                Text(formattedTime(playback.currentTime))
-                Spacer()
-                Text(formattedTime(totalDuration))
-            }
-            .font(.system(size: 11, weight: .medium, design: .rounded).monospacedDigit())
-            .foregroundStyle(foreground.opacity(0.75))
-            .padding(.leading, 42)
-        }
+        WaveformScrub(
+            samples: waveform.map { $0.map { Float($0) } } ?? samples,
+            duration: totalDuration,
+            time: playback.currentTime,
+            isPlaying: playback.isPlaying,
+            rate: $playbackRate,
+            onPlayPause: { playback.togglePlayback() },
+            onSeek: { playback.seek(to: $0, durationLimit: totalDuration) }
+        )
+        .frame(maxWidth: width ?? .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .accessibilityElement(children: .contain)
+        .task(id: audioURL) {
+            guard waveform == nil else { return }
+            samples = (try? await WaveformScrub.samples(from: audioURL)) ?? []
+        }
         .accessibilityLabel("Voice message waveform")
     }
 
@@ -210,6 +178,7 @@ private final class VoiceMessagePlaybackController: ObservableObject {
     @Published private(set) var duration: TimeInterval = 0
 
     private var player: AVPlayer
+    private var playbackRate: Double = 1
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var url: URL
@@ -242,7 +211,7 @@ private final class VoiceMessagePlaybackController: ObservableObject {
             if duration > 0, currentTime >= duration {
                 seek(to: 0)
             }
-            player.play()
+            player.playImmediately(atRate: Float(playbackRate))
             isPlaying = true
         }
     }
@@ -250,6 +219,12 @@ private final class VoiceMessagePlaybackController: ObservableObject {
     func pause() {
         player.pause()
         isPlaying = false
+    }
+
+    func setPlaybackRate(_ rate: Double) {
+        guard rate.isFinite, rate > 0 else { return }
+        playbackRate = rate
+        if isPlaying { player.rate = Float(rate) }
     }
 
     func seek(to seconds: TimeInterval, durationLimit: TimeInterval? = nil) {

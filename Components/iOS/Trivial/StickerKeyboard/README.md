@@ -21,7 +21,7 @@ StickerKeyboard(
 )
 ```
 
-`StickerKeyboard` accepts the app's sticker models; it does not fetch catalog metadata or persist favorites/recent usage. `UserStickerConfiguration.selectedPackIDs` controls the visible pack order. The first three category entries are search, the configured default pack, and favorites. Additional tabs are the selected packs in their configured order. The first category opens `StickerSearchSheet`, which is deliberately separate from installed-pack browsing. Its `onSearch` callback is a handoff point for the app-wide sticker catalogue; this component does not pretend to connect a backend. The search sheet is presented by `SheetCustom`, defaults to 85% of available screen height. It lists the provided sticker packs (title, short description, tags) in randomized order. Tapping a pack opens its detail view with all pack stickers plus install, delete, and like actions. The app owns those actions and passes installed/liked state and callbacks. Recent-search capsules sit immediately above the compact search field, with the search action on the right.
+`StickerKeyboard` accepts the app's sticker models; it does not fetch catalog metadata or persist favorites/recent usage. `UserStickerConfiguration.selectedPackIDs` controls the visible pack order. The first three category entries are search, the configured default pack, and favorites. Additional tabs are the selected packs in their configured order. The first category opens `StickerSearchSheet`, which is deliberately separate from installed-pack browsing. Its `onSearch` callback is a handoff point for the app-wide sticker catalogue; this component does not pretend to connect a backend. The search sheet is presented with the locally vendored `BottomSheet` package, defaults to 90% of available screen height. It lists the provided sticker packs (title, short description, tags) in randomized order. Tapping a pack opens its detail view with all pack stickers plus install, delete, and like actions. The app owns those actions and passes installed/liked state and callbacks. Recent-search capsules sit immediately above the compact search field, with the search action on the right.
 
 `StickerAsset.thumbnailLocation` is preferred for the grid; `originalLocation` is the fallback. Supply appropriately sized thumbnails for best scrolling performance. `LazyVGrid` creates cells on demand and Nuke manages image loading/caching. Remote URLs and local file URLs supported by Nuke can be used.
 
@@ -39,5 +39,5 @@ A compatibility initializer for the earlier Unicode picker remains available for
 
 ## Related reusable UI
 
-- `../SheetCustom`: configurable custom overlay sheet with point/fraction sizing and theme colors.
+- `../SheetConfig`: the verbatim upstream `BottomSheet` Swift package, vendored locally.
 - `../Capsules`: borderless text action capsule using a continuous rounded rectangle.

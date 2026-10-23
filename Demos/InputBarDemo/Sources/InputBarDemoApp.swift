@@ -73,7 +73,6 @@ private struct InputBarDemoView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .padding(.bottom, 8)
-                    .background(.bar)
                 }
                 .onChange(of: messages.count) { _, count in
                     withAnimation(.easeOut(duration: 0.2)) {

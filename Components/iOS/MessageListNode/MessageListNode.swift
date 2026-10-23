@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(BackgroundData)
+import BackgroundData
+#endif
 
 /// A conversation-list row showing a person's avatar, name, and latest message.
 ///
@@ -28,6 +31,7 @@ public struct MessageListNode: View {
     private let bottomBorder: AnyView?
     private let onDelete: (() -> Void)?
     private let onMarkUnread: (() -> Void)?
+    private let openSwipeRow: Binding<AnyHashable?>?
 
     /// Creates a conversation-list row. Custom `Font` values take precedence over
     /// their corresponding size values; leave them nil to use configurable system font sizes.
@@ -54,7 +58,8 @@ public struct MessageListNode: View {
         topBorder: AnyView? = nil,
         bottomBorder: AnyView? = nil,
         onDelete: (() -> Void)? = nil,
-        onMarkUnread: (() -> Void)? = nil
+        onMarkUnread: (() -> Void)? = nil,
+        openSwipeRow: Binding<AnyHashable?>? = nil
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -79,6 +84,7 @@ public struct MessageListNode: View {
         self.bottomBorder = bottomBorder
         self.onDelete = onDelete
         self.onMarkUnread = onMarkUnread
+        self.openSwipeRow = openSwipeRow
     }
 
     public var body: some View {
@@ -128,7 +134,7 @@ public struct MessageListNode: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .modifier(MessageListNodeSwipeActions(onDelete: onDelete, onMarkUnread: onMarkUnread))
+        .modifier(MessageListNodeSwipeActions(onDelete: onDelete, onMarkUnread: onMarkUnread, openSwipeRow: openSwipeRow))
     }
 
     private func limitedText(_ text: String, maximum: Int?) -> String {
@@ -144,28 +150,24 @@ public struct MessageListNode: View {
 private struct MessageListNodeSwipeActions: ViewModifier {
     let onDelete: (() -> Void)?
     let onMarkUnread: (() -> Void)?
+    let openSwipeRow: Binding<AnyHashable?>?
 
     func body(content: Content) -> some View {
-        if onDelete != nil || onMarkUnread != nil {
+        let actions = [
+            onDelete.map { callback in
+                SwipeRowAction("删除", systemImage: "trash", tint: .red, role: .destructive, action: callback)
+            },
+            onMarkUnread.map { callback in
+                SwipeRowAction("标为未读", systemImage: "envelope.badge", tint: .blue, action: callback)
+            }
+        ].compactMap { $0 }
+
+        if actions.isEmpty {
             content
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if let onDelete {
-                        Button(role: .destructive, action: onDelete) {
-                            Label("删除", systemImage: "trash")
-                        }
-                    }
-                    if let onMarkUnread {
-                        Button(action: onMarkUnread) {
-                            Label("标为未读", systemImage: "envelope.badge")
-                        }
-                        .tint(.blue)
-                    }
-                }
-                .transaction { transaction in
-                    transaction.animation = .spring(duration: 0.32, bounce: 0.2)
-                }
         } else {
-            content
+            SwipeActionRow(actions: actions, allowsFullSwipe: false, open: openSwipeRow) {
+                content
+            }
         }
     }
 }

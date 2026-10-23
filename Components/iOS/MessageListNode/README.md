@@ -23,6 +23,6 @@ MessageListNode(
 - `avatarImage` and `avatarPlaceholder` are rendered by the existing `Avatar` component. The default shape is a continuous rounded rectangle with a 6-point corner radius.
 - `unreadCount` is passed to the existing `UnreadBadge` and displayed at the avatar’s top-right corner. A nil or zero count hides the badge; the badge formats counts above 99 as `99+`. `onUnreadBadgeDismiss` is called when the badge is dragged away, so the host can reset the count.
 - Title and subtitle each support a custom `Font`, a system font size, a text color, and a maximum character count. Text exceeding its character limit is shortened with an ellipsis. A custom `Font` takes precedence over the size parameter.
-- A leftward swipe reveals the configured delete and mark-as-unread actions. Each action appears only when its callback is supplied. The host remains responsible for performing the actual data mutation.
+- A leftward swipe reveals the configured delete and mark-as-unread actions using the reusable `SwipeActionRow` gesture implementation. Each action appears only when its callback is supplied. The host remains responsible for performing the actual data mutation.
 
 The component does not own conversation models, navigation, persistence, read state, or list scrolling.

@@ -46,7 +46,7 @@ public struct TabBar: View {
         items: [TabBarItem],
         selection: Binding<String>,
         texture: TabBarTexture = .material,
-        height: CGFloat = 62,
+        height: CGFloat = 42,
         gradientHeight: CGFloat = 108,
         onSelect: ((TabBarItem) -> Void)? = nil
     ) {
@@ -55,7 +55,7 @@ public struct TabBar: View {
         self.items = items
         self._selection = selection
         self.texture = texture
-        self.height = max(44, height)
+        self.height = max(40, height)
         self.gradientHeight = max(0, gradientHeight)
         self.onSelect = onSelect
     }
@@ -76,18 +76,14 @@ public struct TabBar: View {
                         .clipShape(Capsule(style: .continuous))
                 }
                 .overlay {
-                    Capsule(style: .continuous)
-                        .strokeBorder(Color.primary.opacity(texture == .material ? 0.09 : 0.16), lineWidth: 1)
+                    if texture == .material {
+                        Capsule(style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.09), lineWidth: 1)
+                    }
                 }
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
-        .background(alignment: .bottom) {
-            ContainerStyle(height: gradientHeight, style: .black, direction: .bottomToTop)
-                .frame(height: gradientHeight)
-                .ignoresSafeArea(edges: .bottom)
-                .allowsHitTesting(false)
-        }
     }
 
     private func tabButton(_ item: TabBarItem) -> some View {
@@ -100,25 +96,32 @@ public struct TabBar: View {
             }
             onSelect?(item)
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: item.systemImage)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-                    .symbolVariant(isSelected ? .fill : .none)
-                Text(item.title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Capsule())
-            .background {
+            ZStack {
+                // Keep the animated selection capsule in its own background layer.
+                // matchedGeometryEffect preserves the same spring movement between tabs.
                 if isSelected {
                     Capsule(style: .continuous)
                         .fill(selectionFill)
                         .matchedGeometryEffect(id: "tabbar.selection", in: selectionNamespace)
+                        .padding(1)
                 }
+
+                // Draw labels and symbols above the glass/selection layers so they stay crisp.
+                VStack(spacing: 1) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 17, weight: .medium))
+                        .symbolVariant(isSelected ? .fill : .none)
+                        .frame(width: 20, height: 20)
+                        .symbolEffect(.bounce, value: isSelected)
+                    Text(item.title)
+                        .font(.system(size: 10, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.title)
@@ -164,9 +167,9 @@ private struct TabBarTextureBackground: View {
 #if canImport(UIKit) && canImport(LiquidGlassKit)
 private struct LiquidGlassEffectRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
-        let effectView = VisualEffectView(effect: LiquidGlassEffect(style: .regular, isNative: true))
+        let effectView = LiquidGlassEffectView(effect: LiquidGlassEffect(style: .regular, isNative: false))
         effectView.isUserInteractionEnabled = false
-        effectView.backgroundColor = .clear
+        effectView.backgroundColor = UIColor.clear
         return effectView
     }
 

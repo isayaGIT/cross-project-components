@@ -9,6 +9,37 @@ import UIKit
 /// caching, persistence, and retry policy belong to the caller or an image
 /// loading module. Pass `nil` while no image is available to show a placeholder.
 public struct Avatar: View {
+    /// Complete set of visual and interaction options for an avatar.
+    public struct Configuration {
+        public var width: CGFloat
+        public var height: CGFloat
+        public var shape: Shape
+        public var scaling: Scaling
+        public var placeholder: Image?
+        public var placeholderStyle: PlaceholderStyle
+        public var pokeEnabled: Bool
+        public var vibration: CGFloat
+
+        public init(
+            width: CGFloat,
+            height: CGFloat,
+            shape: Shape = .circle,
+            scaling: Scaling = .fill,
+            placeholder: Image? = nil,
+            placeholderStyle: PlaceholderStyle = .default,
+            pokeEnabled: Bool = false,
+            vibration: CGFloat = 0
+        ) {
+            self.width = width
+            self.height = height
+            self.shape = shape
+            self.scaling = scaling
+            self.placeholder = placeholder
+            self.placeholderStyle = placeholderStyle
+            self.pokeEnabled = pokeEnabled
+            self.vibration = vibration
+        }
+    }
     public enum Shape: Sendable {
         case circle
         case roundedRectangle(cornerRadius: CGFloat)
@@ -68,6 +99,20 @@ public struct Avatar: View {
         self.placeholderStyle = placeholderStyle
         self.pokeEnabled = pokeEnabled
         self.vibration = min(max(vibration, 0), 1)
+    }
+
+    public init(image: Image?, configuration: Configuration) {
+        self.init(
+            image: image,
+            width: configuration.width,
+            height: configuration.height,
+            shape: configuration.shape,
+            scaling: configuration.scaling,
+            placeholder: configuration.placeholder,
+            placeholderStyle: configuration.placeholderStyle,
+            pokeEnabled: configuration.pokeEnabled,
+            vibration: configuration.vibration
+        )
     }
 
     public var body: some View {

@@ -1,0 +1,1374 @@
+// Copyright (c) 2026 Saivion Hayes
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, and distribute the Software as part of
+// an application, website, or product, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// Commons Clause Restriction
+//
+// You may use this Software, including for any commercial purpose, so long as
+// you do not sell, sublicense, or redistribute the components themselves, whether
+// alone, in a bundle, or as a ported version.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+import SwiftUI
+import UIKit
+
+/// A scrolling grid of `Identifiable` items with drag-to-select: photos, files, attachments, media.
+///
+/// In selection mode a sideways drag (or a short hold, then any direction) paints every item from
+/// the first one touched to the one under the finger, in reading order. Dragging back unpaints.
+/// Starting on a selected item deselects instead. A vertical swipe still scrolls, and holding the
+/// finger near the top or bottom edge scrolls the grid while painting. Tap toggles one item.
+///
+/// - Parameters:
+///   - items: The items, in reading order. When items disappear, their IDs are dropped from `selection`.
+///   - selection: The selected IDs. Painting and taps write here; set it yourself for Select All or Clear.
+///   - isSelecting: Selection mode. While `false`, cells behave like your content (taps reach your buttons and links) and painting is off. Turning it off keeps `selection`; clear it yourself if you want to.
+///   - minimumCellWidth: The narrowest a cell may be. The column count is the most that fit at this width, so it adapts to rotation, iPad and split view.
+///   - aspectRatio: Cell width divided by height. `1` is square; `0.75` suits portrait posters or documents.
+///   - longPressToSelect: When `true`, holding a cell outside selection mode turns selection mode on, selects that cell and keeps painting as the finger moves. Pass `false` if your cells have their own context menu.
+///   - style: Spacing, corner radius, the selected inset, badge colors and auto-scroll tuning. Defaults to the SwiftPieces house palette.
+///   - cell: Builds a cell's content from the item and whether it is selected. It fills the cell and is clipped to the cell's rounded shape; the grid draws the badge and inset.
+public struct DragSelectGrid<Item: Identifiable, Cell: View>: View {
+    /// Look and feel. `.standard` is the house palette. The same type as `DragSelectGridStyle`, so `.init(spacing: 2)` works at the call site.
+    public typealias Style = DragSelectGridStyle
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .body) private var badgeSize: CGFloat = 24
+    @Binding private var selection: Set<Item.ID>
+    @Binding private var isSelecting: Bool
+    @State private var width: CGFloat = 0
+    @State private var session: Session?
+    /// The print under a finger that is resting into a hold, which sinks slightly until the hold fires or lets go.
+    @State private var heldID: Item.ID?
+    /// After a long press turns selection mode on: how many rows or columns each nearby print sits from the held
+    /// one, so the empty rings spread out from the finger. `nil` when the mode was turned on some other way.
+    @State private var rings: [Item.ID: Int]?
+    @State private var startTick = 0
+    @State private var stepTick = 0
+    @State private var tapTick = 0
+
+    private let items: [Item]
+    private let minimumCellWidth: CGFloat
+    private let aspectRatio: CGFloat
+    private let longPressToSelect: Bool
+    private let style: Style
+    private let cell: (Item, Bool) -> Cell
+    /// Rows or columns the rings spread across, one beat each, before the rest arrive together.
+    private let ringReach = 7
+
+    /// One drag: where it started, where the finger is, whether it adds or removes, and the selection before it.
+    private struct Session {
+        var anchor: Int
+        var current: Int
+        var selects: Bool
+        var base: Set<Item.ID>
+    }
+
+    public init(_ items: [Item], selection: Binding<Set<Item.ID>>, isSelecting: Binding<Bool>, minimumCellWidth: CGFloat = 96, aspectRatio: CGFloat = 1, longPressToSelect: Bool = true, style: Style = .standard, @ViewBuilder cell: @escaping (Item, Bool) -> Cell) {
+        self.items = items
+        self._selection = selection
+        self._isSelecting = isSelecting
+        self.minimumCellWidth = max(minimumCellWidth, 44)
+        self.aspectRatio = aspectRatio > 0 ? aspectRatio : 1
+        self.longPressToSelect = longPressToSelect
+        self.style = style
+        self.cell = cell
+    }
+
+    private var columns: Int {
+        guard width > 0 else { return 1 }
+        return max(1, Int((width + style.spacing) / (minimumCellWidth + style.spacing)))
+    }
+
+    private var cellSize: CGSize {
+        let w = max(0, (width - style.spacing * CGFloat(columns - 1)) / CGFloat(columns))
+        return CGSize(width: w, height: w / aspectRatio)
+    }
+
+    public var body: some View {
+        let columns = self.columns
+        ScrollView {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: style.spacing), count: columns), spacing: style.spacing) {
+                ForEach(items) { item in
+                    cellView(item)
+                }
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .opacity(width > 0 ? 1 : 0)
+            .background {
+                PaintSurface(
+                    metrics: .init(columns: columns, cellSize: cellSize, spacing: style.spacing, count: items.count, isRightToLeft: layoutDirection == .rightToLeft),
+                    allowsSwipe: isEnabled && isSelecting,
+                    allowsHold: isEnabled && (isSelecting || longPressToSelect),
+                    holdDuration: isSelecting ? 0.25 : 0.45,
+                    edgeZone: style.edgeZone,
+                    speed: style.autoscrollSpeed,
+                    onHold: hold(at:),
+                    onBegin: begin(at:),
+                    onMove: move(to:tick:),
+                    onEnd: end
+                )
+            }
+        }
+        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: startTick)
+        .sensoryFeedback(.selection, trigger: stepTick)
+        .sensoryFeedback(.selection, trigger: tapTick)
+        .onChange(of: isSelecting) { _, selecting in
+            if !selecting {
+                session = nil
+                rings = nil
+            }
+        }
+        .onChange(of: items.map(\.id)) { _, ids in
+            session = nil
+            let present = Set(ids)
+            let kept = selection.filter(present.contains)
+            if kept.count != selection.count { selection = kept }
+        }
+    }
+
+    // MARK: Cell
+
+    private func cellView(_ item: Item) -> some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        let isSelected = selection.contains(item.id)
+        let isHeld = heldID == item.id
+        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+        let badge = min(badgeSize, 34, cellSize.width * 0.34)
+        let margin = max(4, badge * 0.25)
+        return Color.clear
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .overlay {
+                cell(item, isSelected)
+                    .allowsHitTesting(!isSelecting)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                DragSelectGridBadge(
+                    shown: isSelecting || isSelected,
+                    isSelected: isSelected,
+                    ring: rings.map { $0[item.id] ?? ringReach } ?? 0,
+                    size: badge,
+                    margin: margin,
+                    style: style
+                )
+                // Counter the inset so the badge keeps one size whether the cell is selected or not.
+                .scaleEffect(isSelected ? 1 / style.selectedScale : 1, anchor: .bottomTrailing)
+                .padding(margin)
+            }
+            // Also the badge's edge: it buds out of the print's corner from just past it, where this clip hides it.
+            .clipShape(shape)
+            .contentShape(shape)
+            .scaleEffect(isSelected ? style.selectedScale : 1)
+            // The print presses into its slot on the snap spring and comes back out on the morph's slight give, so
+            // dragging back across a range reads as a soft release. Your cell content changes on the same spring.
+            .animation(isSelected ? motion.snap : motion.morph, value: isSelected)
+            // While a hold builds, the print sinks a couple of points under the resting finger, slowly and with no
+            // overshoot (a press never bounces under the finger), and the selection takes over when it fires. Under
+            // Reduce Motion it dims at once instead.
+            .animation(isHeld ? (reduceMotion ? motion.press : .spring(duration: 0.5, bounce: 0)) : motion.snap) {
+                $0.scaleEffect(isHeld && !reduceMotion ? PieceMotion.pressScale(for: cellSize, depth: 2) : 1)
+                    .brightness(isHeld && reduceMotion ? (colorScheme == .dark ? 0.1 : -0.08) : 0)
+            }
+            .gesture(TapGesture().onEnded { toggle(item.id) }, including: isSelecting ? .all : .subviews)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityAddTraits(isSelecting ? .isButton : [])
+            .accessibilityHint(isSelecting ? (isSelected ? Text("Double-tap to deselect.") : Text("Double-tap to select.")) : Text(""))
+            .accessibilityActions {
+                if isSelected {
+                    Button("Deselect") { toggle(item.id) }
+                } else {
+                    Button("Select") {
+                        if !isSelecting { isSelecting = true }
+                        toggle(item.id)
+                    }
+                }
+            }
+    }
+
+    // MARK: Selection
+
+    private func toggle(_ id: Item.ID) {
+        guard session == nil else { return }
+        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        tapTick += 1
+    }
+
+    /// A hold building on the print at `index`, or `nil` once it fires, turns into a scroll or lets go.
+    private func hold(at index: Int?) {
+        heldID = index.flatMap { items.indices.contains($0) ? items[$0].id : nil }
+    }
+
+    private func begin(at index: Int) {
+        guard items.indices.contains(index) else { return }
+        heldID = nil
+        if !isSelecting {
+            rings = ringSteps(around: index)
+            isSelecting = true
+        }
+        let selects = !selection.contains(items[index].id)
+        session = Session(anchor: index, current: index, selects: selects, base: selection)
+        apply()
+        startTick += 1
+    }
+
+    private func move(to index: Int, tick: Bool) {
+        guard var current = session, index != current.current, items.indices.contains(index) else { return }
+        current.current = index
+        session = current
+        apply()
+        if tick { stepTick += 1 }
+    }
+
+    /// The selection is always the snapshot from the start of the drag with the current range applied,
+    /// so dragging back past an item restores what it was before.
+    private func apply() {
+        guard let session, items.indices.contains(session.anchor), items.indices.contains(session.current) else { return }
+        var next = session.base
+        for item in items[min(session.anchor, session.current)...max(session.anchor, session.current)] {
+            if session.selects { next.insert(item.id) } else { next.remove(item.id) }
+        }
+        if next != selection { selection = next }
+    }
+
+    private func end() {
+        guard let finished = session else { return }
+        session = nil
+        if selection != finished.base {
+            AccessibilityNotification.Announcement(String(localized: "\(selection.count) selected")).post()
+        }
+    }
+
+    /// How many rows or columns each print within `ringReach` of `origin` sits from it. Prints further out arrive
+    /// on the last step.
+    private func ringSteps(around origin: Int) -> [Item.ID: Int] {
+        let columns = self.columns, row = origin / columns, column = origin % columns
+        var steps: [Item.ID: Int] = [:]
+        for r in max(row - ringReach, 0)...(row + ringReach) {
+            for c in 0..<columns {
+                let index = r * columns + c
+                guard items.indices.contains(index) else { break }
+                steps[items[index].id] = max(abs(r - row), abs(c - column))
+            }
+        }
+        return steps
+    }
+}
+
+/// Look and feel of a `DragSelectGrid`. `.standard` is the house palette.
+public struct DragSelectGridStyle: Sendable {
+    /// Gap between cells, both ways.
+    public var spacing: CGFloat
+    /// Cell corner radius.
+    public var cornerRadius: CGFloat
+    /// How far a selected cell shrinks inside its slot (1 means no inset).
+    public var selectedScale: CGFloat
+    /// The glass tint of the check badge on a selected cell. Unselected badges are clear glass.
+    public var badge: Color
+    /// The check glyph on the badge.
+    public var badgeInk: Color
+    /// The rim of every badge, so the glass reads on any thumbnail, even as the empty circle on an unselected cell in
+    /// selection mode. Light by default.
+    public var ring: Color
+    /// Height of the band at the top and bottom edges where painting auto-scrolls.
+    public var edgeZone: CGFloat
+    /// Auto-scroll speed in points per second with the finger at (or past) the very edge. It scales down linearly with depth into the band.
+    public var autoscrollSpeed: CGFloat
+
+    /// Pass only what you want to change; `nil` keeps the house value.
+    public init(spacing: CGFloat = 4, cornerRadius: CGFloat = 10, selectedScale: CGFloat = 0.86, badge: Color? = nil, badgeInk: Color? = nil, ring: Color? = nil, edgeZone: CGFloat = 72, autoscrollSpeed: CGFloat = 1200) {
+        self.spacing = max(spacing, 0)
+        self.cornerRadius = max(cornerRadius, 0)
+        self.selectedScale = min(max(selectedScale, 0.6), 1)
+        // The house signal red with dark ink: the one action colour, so a picked print reads at a glance on any thumbnail.
+        self.badge = badge ?? Color(red: 1, green: 0, blue: 0)
+        self.badgeInk = badgeInk ?? Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255)
+        self.ring = ring ?? .white
+        self.edgeZone = max(edgeZone, 24)
+        self.autoscrollSpeed = max(autoscrollSpeed, 0)
+    }
+
+    public static let standard = DragSelectGridStyle()
+}
+
+// MARK: - Badge
+
+/// A print's selection badge: a liquid glass bubble in its bottom trailing corner, rimmed so it reads on any thumbnail.
+///
+/// It buds out of the corner when it is needed (selection mode turning on, or the print picked) and melts back into the
+/// corner when it is not: home is just past the corner, shrunk, where the print's rounded clip hides it. Picked, it
+/// floods with the badge tint and the check stamps down onto it; the tint drains as it melts home. Each badge is a
+/// glass shape of its own, a cell apart from the next, so it never merges with another.
+private struct DragSelectGridBadge: View {
+    /// In selection mode, or picked.
+    let shown: Bool
+    let isSelected: Bool
+    /// Rows or columns from the print a hold turned selection mode on at: the badge waits a beat per ring, so the
+    /// badges spread out from the finger, all within about 120ms.
+    let ring: Int
+    let size: CGFloat
+    /// The badge's distance from the print's edges.
+    let margin: CGFloat
+    let style: DragSelectGridStyle
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var buds = PieceBuds()
+
+    var body: some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        let out = buds.isOut("badge")
+        // Far enough past the corner that the shrunk badge clears the print whatever its corner radius.
+        let reach = margin + size / 2 + size * PieceLiquid.homeScale / 2 / 2.squareRoot() + 1
+        return ZStack {
+            if buds.contains("badge") {
+                PieceLiquidGroup(lift: false) {
+                    // The stamp: the check comes down onto the badge a beat after the print starts pressing in, landing
+                    // on the success spring with a visible give, and lifts off quickly when cleared. Under Reduce
+                    // Motion it fades in place.
+                    Image(systemName: "checkmark")
+                        .font(.system(size: size * 0.46, weight: .semibold))
+                        .foregroundStyle(style.badgeInk)
+                        .scaleEffect(isSelected || reduceMotion ? 1 : 1.4)
+                        .opacity(isSelected ? 1 : 0)
+                        .animation(isSelected ? motion.cascade(motion.success, index: 1, step: 0.05) : motion.dismiss, value: isSelected)
+                        .pieceBudContent(out: out)
+                        .frame(width: size, height: size)
+                        .overlay { Circle().strokeBorder(style.ring, lineWidth: max(1.5, size / 14)) }
+                        // The tint floods on the print's press-in spring and drains while the badge is home.
+                        .pieceLiquid(.circle, tint: isSelected && out ? style.badge : nil, interactive: false)
+                }
+                // Offsets mirror in right-to-left layouts, so this is the trailing corner either way.
+                .pieceBud(out: out, home: CGSize(width: reach, height: reach))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+        // A print that scrolls into view, or a grid that opens, shows its badge already out.
+        .onAppear { if shown { buds.place(["badge"]) } }
+        // Only the latest change acts, so a badge that is needed again mid-melt never ends up out of step.
+        .task(id: shown) {
+            if shown {
+                guard !buds.isOut("badge") else { return }
+                if ring > 0, !reduceMotion { try? await Task.sleep(for: .milliseconds(17 * min(ring, 7))) }
+                guard !Task.isCancelled else { return }
+                await buds.bloom(["badge"], reduceMotion: reduceMotion)
+            } else if buds.contains("badge") {
+                await buds.gather(["badge"], reduceMotion: reduceMotion)
+            }
+        }
+    }
+}
+
+// MARK: - Painting gesture
+
+/// Cell geometry the gesture needs to turn a point into an index without asking SwiftUI for frames
+/// (a lazy grid has no frames for rows that are off screen, and auto-scroll paints through them).
+private struct PaintMetrics: Equatable {
+    var columns: Int
+    var cellSize: CGSize
+    var spacing: CGFloat
+    var count: Int
+    var isRightToLeft: Bool
+}
+
+/// An invisible view behind the grid. Once it is in a window it finds the enclosing scroll view
+/// (SwiftUI's `ScrollView` is a `UIScrollView`) and installs the painting recognizer on it, so the
+/// recognizer can tell the scroll view's own pan to wait for its decision.
+private struct PaintSurface: UIViewRepresentable {
+    var metrics: PaintMetrics
+    var allowsSwipe: Bool
+    var allowsHold: Bool
+    var holdDuration: TimeInterval
+    var edgeZone: CGFloat
+    var speed: CGFloat
+    var onHold: (Int?) -> Void
+    var onBegin: (Int) -> Void
+    var onMove: (Int, Bool) -> Void
+    var onEnd: () -> Void
+
+    func makeCoordinator() -> PaintController { PaintController() }
+
+    func makeUIView(context: Context) -> PaintAnchorView {
+        let view = PaintAnchorView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        view.controller = context.coordinator
+        context.coordinator.anchor = view
+        return view
+    }
+
+    func updateUIView(_ view: PaintAnchorView, context: Context) {
+        let controller = context.coordinator
+        controller.metrics = metrics
+        controller.edgeZone = edgeZone
+        controller.speed = speed
+        controller.onHold = onHold
+        controller.onBegin = onBegin
+        controller.onMove = onMove
+        controller.onEnd = onEnd
+        controller.recognizer.allowsSwipe = allowsSwipe
+        controller.recognizer.allowsHold = allowsHold
+        controller.recognizer.holdDuration = holdDuration
+        controller.recognizer.isEnabled = allowsSwipe || allowsHold
+    }
+
+    static func dismantleUIView(_ view: PaintAnchorView, coordinator: PaintController) {
+        coordinator.attach(to: nil)
+    }
+}
+
+private final class PaintAnchorView: UIView {
+    weak var controller: PaintController?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        controller?.attach(to: window == nil ? nil : enclosingScrollView)
+    }
+
+    private var enclosingScrollView: UIScrollView? {
+        var view = superview
+        while let current = view {
+            if let scrollView = current as? UIScrollView { return scrollView }
+            view = current.superview
+        }
+        return nil
+    }
+}
+
+/// Drives one paint: maps the finger to an index, reports changes, and auto-scrolls near the edges.
+@MainActor
+private final class PaintController: NSObject {
+    let recognizer = PaintRecognizer()
+    weak var anchor: UIView?
+    private weak var scrollView: UIScrollView?
+    var metrics = PaintMetrics(columns: 1, cellSize: .zero, spacing: 0, count: 0, isRightToLeft: false)
+    var edgeZone: CGFloat = 72
+    var speed: CGFloat = 1200
+    var onHold: ((Int?) -> Void)?
+    var onBegin: ((Int) -> Void)?
+    var onMove: ((Int, Bool) -> Void)?
+    var onEnd: (() -> Void)?
+
+    private var link: CADisplayLink?
+    private var lastIndex: Int?
+    private var lastTick: CFTimeInterval = 0
+    private var lastFrame: CFTimeInterval = 0
+
+    override init() {
+        super.init()
+        recognizer.addTarget(self, action: #selector(handle(_:)))
+        recognizer.onHoldCue = { [weak self] shown in self?.holdCue(shown) }
+    }
+
+    /// Tells the grid which item a building hold rests on, or that the hold is over.
+    private func holdCue(_ shown: Bool) {
+        guard shown else {
+            // A hold can end inside a SwiftUI update (the grid disabled or removed mid-touch), so the grid hears
+            // it on the next turn instead of having its state written mid-update. A paint clears it at once.
+            Task { @MainActor [weak self] in self?.onHold?(nil) }
+            return
+        }
+        onHold?(index(at: recognizer.location(in: anchor)))
+    }
+
+    func attach(to newScrollView: UIScrollView?) {
+        guard newScrollView !== scrollView else { return }
+        scrollView?.removeGestureRecognizer(recognizer)
+        stop()
+        scrollView = newScrollView
+        newScrollView?.addGestureRecognizer(recognizer)
+    }
+
+    @objc private func handle(_ recognizer: PaintRecognizer) {
+        switch recognizer.state {
+        case .began:
+            guard let index = index(at: recognizer.location(in: anchor)) else { return }
+            // Stop a fling in progress so the grid holds still under the finger.
+            if let scrollView { scrollView.setContentOffset(scrollView.contentOffset, animated: false) }
+            lastIndex = index
+            lastTick = CACurrentMediaTime()
+            onBegin?(index)
+            startLink()
+        case .changed:
+            update()
+        default:
+            stop()
+        }
+    }
+
+    private func stop() {
+        link?.invalidate()
+        link = nil
+        lastFrame = 0
+        if lastIndex != nil {
+            lastIndex = nil
+            onEnd?()
+        }
+    }
+
+    private func update() {
+        guard lastIndex != nil, let index = index(at: recognizer.location(in: anchor)), index != lastIndex else { return }
+        lastIndex = index
+        // One tick per item crossed, but never faster than about 22 a second, so a fast
+        // drag or auto-scroll through many rows reads as texture rather than a buzz.
+        let now = CACurrentMediaTime()
+        let tick = now - lastTick > 0.045
+        if tick { lastTick = now }
+        onMove?(index, tick)
+    }
+
+    /// Reading-order index under a point in the grid's own coordinates. Points in a gutter or past
+    /// an edge snap to the nearest cell; points past the last item snap to the last item.
+    private func index(at point: CGPoint) -> Int? {
+        let m = metrics
+        guard m.count > 0, m.columns > 0, m.cellSize.width > 0, m.cellSize.height > 0 else { return nil }
+        let pitchX = m.cellSize.width + m.spacing
+        let pitchY = m.cellSize.height + m.spacing
+        let rows = (m.count + m.columns - 1) / m.columns
+        let x = m.isRightToLeft ? (anchor?.bounds.width ?? 0) - point.x : point.x
+        let column = min(max(Int(((x + m.spacing / 2) / pitchX).rounded(.down)), 0), m.columns - 1)
+        let row = min(max(Int(((point.y + m.spacing / 2) / pitchY).rounded(.down)), 0), rows - 1)
+        return min(row * m.columns + column, m.count - 1)
+    }
+
+    private func startLink() {
+        link?.invalidate()
+        let link = CADisplayLink(target: self, selector: #selector(step(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    /// Auto-scroll: speed grows linearly with how deep the finger sits in the edge band.
+    @objc private func step(_ link: CADisplayLink) {
+        guard let scrollView, lastIndex != nil else { return }
+        let dt = lastFrame == 0 ? link.duration : min(max(link.timestamp - lastFrame, 0), 0.05)
+        lastFrame = link.timestamp
+        let insets = scrollView.adjustedContentInset
+        let top = insets.top
+        let bottom = scrollView.bounds.height - insets.bottom
+        let zone = min(edgeZone, max((bottom - top) / 4, 1))
+        let y = recognizer.location(in: scrollView).y - scrollView.contentOffset.y
+        var velocity: CGFloat = 0
+        if y < top + zone { velocity = -speed * min(1, (top + zone - y) / zone) }
+        else if y > bottom - zone { velocity = speed * min(1, (y - (bottom - zone)) / zone) }
+        guard velocity != 0 else { return }
+        let minY = -insets.top
+        let maxY = max(minY, scrollView.contentSize.height - scrollView.bounds.height + insets.bottom)
+        let next = min(max(scrollView.contentOffset.y + velocity * dt, minY), maxY)
+        guard abs(next - scrollView.contentOffset.y) > 0.01 else { return }
+        scrollView.contentOffset.y = next
+        update()
+    }
+}
+
+/// Decides between painting and scrolling within the first few points of movement.
+///
+/// It begins on a mostly horizontal drag (when `allowsSwipe`) or after the finger has held still for
+/// `holdDuration` (when `allowsHold`), and fails on anything else, which hands the touch to the scroll
+/// view. The scroll view's pan waits for that decision, so the two never both move.
+private final class PaintRecognizer: UIGestureRecognizer {
+    var allowsSwipe = false
+    var allowsHold = false
+    var holdDuration: TimeInterval = 0.25
+    /// Called with `true` once a touch that may become a hold has rested `cueDelay`, and with `false` as soon as
+    /// it begins painting, fails, lifts or is cancelled, so the grid can show the hold building.
+    var onHoldCue: ((Bool) -> Void)?
+    private var start: CGPoint = .zero
+    private var holdTask: Task<Void, Never>?
+    private var cueTask: Task<Void, Never>?
+    private var cueShown = false
+
+    /// Movement (in points) before the direction is judged.
+    private let slop: CGFloat = 8
+    /// How long a touch rests before the hold shows. A quick scroll passes `slop` before then and never dips a
+    /// cell; a scroll that starts after a pause lets the print back up as it starts.
+    private let cueDelay: TimeInterval = 0.1
+
+    /// A recognizer turned off mid-touch may not reset, so it lets go of the cue itself.
+    override var isEnabled: Bool {
+        didSet { if !isEnabled { endCue() } }
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        guard state == .possible else { return }
+        guard numberOfTouches == 1, let touch = touches.first else {
+            fail()
+            return
+        }
+        start = touch.location(in: nil)
+        guard allowsHold else { return }
+        let delay = holdDuration
+        holdTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self, self.state == .possible, self.numberOfTouches == 1 else { return }
+            self.endCue()
+            self.state = .began
+        }
+        let cueDelay = cueDelay
+        cueTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(cueDelay))
+            guard !Task.isCancelled, let self, self.state == .possible, self.numberOfTouches == 1 else { return }
+            self.cueShown = true
+            self.onHoldCue?(true)
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesMoved(touches, with: event)
+        switch state {
+        case .possible:
+            guard let touch = touches.first else { return }
+            let p = touch.location(in: nil)
+            let dx = p.x - start.x, dy = p.y - start.y
+            guard hypot(dx, dy) >= slop else { return }
+            // Within about 40 degrees of horizontal paints; anything steeper scrolls.
+            if allowsSwipe, abs(dx) > abs(dy) * 1.2 {
+                holdTask?.cancel()
+                endCue()
+                state = .began
+            } else {
+                fail()
+            }
+        case .began, .changed:
+            state = .changed
+        default:
+            break
+        }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesEnded(touches, with: event)
+        if state == .began || state == .changed { state = .ended } else { fail() }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesCancelled(touches, with: event)
+        if state == .began || state == .changed { state = .cancelled } else { fail() }
+    }
+
+    override func reset() {
+        super.reset()
+        holdTask?.cancel()
+        holdTask = nil
+        endCue()
+    }
+
+    /// The pans of the grid's scroll view and of any scroll view around it (a screen-level `ScrollView`)
+    /// wait until this recognizer fails, so a paint never drags an outer scroll view along.
+    override func shouldBeRequiredToFail(by otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let view, let scrollView = otherGestureRecognizer.view as? UIScrollView,
+           otherGestureRecognizer === scrollView.panGestureRecognizer, view.isDescendant(of: scrollView) {
+            return true
+        }
+        return super.shouldBeRequiredToFail(by: otherGestureRecognizer)
+    }
+
+    private func fail() {
+        holdTask?.cancel()
+        endCue()
+        if state == .possible { state = .failed }
+    }
+
+    /// Stops a pending cue and lets go of a shown one. Called on every way out of `.possible`, since a failed
+    /// recognizer is only reset once the finger lifts, and a scroll can run long before that.
+    private func endCue() {
+        cueTask?.cancel()
+        cueTask = nil
+        guard cueShown else { return }
+        cueShown = false
+        onHoldCue?(false)
+    }
+}
+
+// MARK: - Example
+
+/// A sample library item: a small flat scene in the house blocks standing in for a photo, and now and then a video.
+private struct DragSelectGridSample: Identifiable {
+    enum Scene {
+        case hills(Int), sea(Int), portrait(Int), night, arch(Int), fields(Int)
+    }
+
+    let id: Int
+    let scene: Scene
+    /// A video's running time, shown on the print; `nil` for a photo.
+    let duration: String?
+
+    static let all: [DragSelectGridSample] = (0..<120).map { i in
+        // Seven prints a cycle against the columns, so no scene lines up with itself or sits beside itself, and the
+        // dark night scene comes round once a cycle. Each pass takes the next colourway.
+        let order = [0, 4, 1, 2, 5, 3, 1]
+        let way = (i / order.count + i) % 3
+        let scene: Scene = switch order[i % order.count] {
+        case 0: .hills(way)
+        case 1: .sea(way)
+        case 2: .portrait(way)
+        case 3: .night
+        case 4: .arch(way)
+        default: .fields(way)
+        }
+        return DragSelectGridSample(id: i, scene: scene, duration: i % 7 == 3 ? String(format: "0:%02d", (12 + i) % 60) : nil)
+    }
+}
+
+/// Draws a sample's scene in a 100 by 100 box, filling the cell like a cropped photo.
+private struct SampleThumbnail: View {
+    let sample: DragSelectGridSample
+
+    private static func hex(_ value: UInt32) -> Color {
+        Color(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
+    }
+
+    private static let red = hex(0xFF0000), sky = hex(0x9CC2FF), butter = hex(0xFFD976), sage = hex(0xA9DCB7)
+    private static let lilac = hex(0xCDB8FF), sand = hex(0xE9D5B3), ink = hex(0x141414), dusk = hex(0x262626)
+    private static let night = hex(0x1C1C1C), star = hex(0xF4F3EF)
+
+    var body: some View {
+        Canvas { context, size in
+            let unit = max(size.width, size.height) / 100
+            context.translateBy(x: (size.width - unit * 100) / 2, y: (size.height - unit * 100) / 2)
+            context.scaleBy(x: unit, y: unit)
+            draw(in: &context)
+        }
+        .overlay(alignment: .bottomLeading) {
+            if let duration = sample.duration {
+                Text(duration)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(LinearGradient(colors: [.black.opacity(0.45), .clear], startPoint: .bottom, endPoint: .top))
+            }
+        }
+    }
+
+    private func draw(in context: inout GraphicsContext) {
+        func fill(_ path: Path, _ color: Color, opacity: Double = 1) {
+            context.fill(path, with: .color(color.opacity(opacity)))
+        }
+        func circle(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+        }
+        func oval(_ x: CGFloat, _ y: CGFloat, _ rx: CGFloat, _ ry: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: x - rx, y: y - ry, width: rx * 2, height: ry * 2))
+        }
+        /// A field from `y` down to the bottom, its top edge bowed up by `rise`.
+        func band(_ y: CGFloat, rise: CGFloat) -> Path {
+            Path {
+                $0.move(to: CGPoint(x: 0, y: y))
+                $0.addQuadCurve(to: CGPoint(x: 100, y: y), control: CGPoint(x: 50, y: y - rise))
+                $0.addLine(to: CGPoint(x: 100, y: 100))
+                $0.addLine(to: CGPoint(x: 0, y: 100))
+                $0.closeSubpath()
+            }
+        }
+        let all = Path(CGRect(x: 0, y: 0, width: 100, height: 100))
+        switch sample.scene {
+        case .hills(let way):
+            // Hills under a sun.
+            let c = [[Self.sky, Self.butter, Self.sage, Self.lilac], [Self.sand, Self.red, Self.butter, Self.sage], [Self.lilac, Self.butter, Self.sky, Self.sand]][way]
+            fill(all, c[0]); fill(circle(70, 32, 13), c[1]); fill(oval(82, 104, 64, 34), c[3]); fill(oval(22, 108, 70, 38), c[2])
+        case .sea(let way):
+            // The sun setting into the sea.
+            let c = [[Self.butter, Self.red, Self.sky], [Self.lilac, Self.butter, Self.sky], [Self.sand, Self.red, Self.lilac]][way]
+            fill(all, c[0]); fill(circle(50, 62, 20), c[1]); fill(Path(CGRect(x: 0, y: 62, width: 100, height: 38)), c[2])
+            fill(Path(roundedRect: CGRect(x: 38, y: 70, width: 24, height: 3), cornerRadius: 1.5), c[1], opacity: 0.7)
+            fill(Path(roundedRect: CGRect(x: 44, y: 78, width: 12, height: 3), cornerRadius: 1.5), c[1], opacity: 0.5)
+        case .portrait(let way):
+            let c = [[Self.lilac, Self.ink], [Self.sage, Self.dusk], [Self.butter, Self.ink]][way]
+            fill(all, c[0]); fill(circle(50, 42, 15), c[1]); fill(oval(50, 106, 36, 34), c[1])
+        case .night:
+            // A moon over dark hills.
+            fill(all, Self.dusk); fill(circle(66, 32, 12), Self.butter)
+            fill(circle(24, 22, 1.6), Self.star); fill(circle(38, 40, 1.2), Self.star); fill(circle(16, 46, 1), Self.star)
+            fill(oval(30, 106, 72, 30), Self.night)
+        case .arch(let way):
+            // An arch, with the sky through it.
+            let c = [[Self.sand, Self.sky], [Self.red, Self.butter], [Self.sage, Self.lilac]][way]
+            fill(all, c[0]); fill(Path(CGRect(x: 30, y: 52, width: 40, height: 48)), c[1]); fill(circle(50, 52, 20), c[1])
+            fill(circle(58, 50, 6), c[0], opacity: 0.5)
+        case .fields(let way):
+            // Fields in bands.
+            let c = [[Self.sky, Self.butter, Self.sage, Self.red], [Self.lilac, Self.sand, Self.butter, Self.sky], [Self.butter, Self.sage, Self.sky, Self.red]][way]
+            fill(all, c[0]); fill(circle(74, 28, 9), c[3]); fill(band(52, rise: 20), c[1]); fill(band(74, rise: 24), c[2])
+        }
+    }
+}
+
+private struct DragSelectGridExample: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var selection: Set<Int> = [1, 2, 11]
+    @State private var isSelecting = true
+    /// The count pill: out while there is a selection to count.
+    @State private var buds = PieceBuds()
+    @State private var doneWidth: CGFloat = 0
+    @State private var countWidth: CGFloat = 0
+
+    private static let ink = Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255)
+    private static let signal = Color(red: 1, green: 0, blue: 0)
+    private var motion: PieceMotion { PieceMotion(reduceMotion: reduceMotion) }
+    private var counts: Bool { isSelecting && !selection.isEmpty }
+
+    var body: some View {
+        DragSelectGrid(DragSelectGridSample.all, selection: $selection, isSelecting: $isSelecting) { item, _ in
+            SampleThumbnail(sample: item)
+                .accessibilityLabel(item.duration == nil ? "Photo \(item.id + 1)" : "Video \(item.id + 1)")
+        }
+        .contentMargins(.horizontal, 12, for: .scrollContent)
+        .contentMargins(.bottom, 80, for: .scrollContent)
+        .overlay(alignment: .bottom) {
+            // Tap Done (it clears the selection here), then hold a print: selection mode comes back with the badges
+            // budding out ring by ring from it, and the count buds out of Done with that first pick.
+            bar
+                .padding(.bottom, 12)
+        }
+        .fontWeight(.semibold)
+        .onAppear { if counts { buds.place(["count"]) } }
+        .task(id: counts) {
+            if counts {
+                guard !buds.isOut("count") else { return }
+                await buds.bloom(["count"], reduceMotion: reduceMotion)
+            } else if buds.contains("count") {
+                await buds.gather(["count"], reduceMotion: reduceMotion)
+            }
+        }
+    }
+
+    /// The selection toolbar: Done (Select outside selection mode) in signal glass, and the live count in a glass pill
+    /// joined to it. The count buds out of Done with the first pick and melts back into it when the selection empties
+    /// or selection mode ends. It is round while home, so it hides inside Done, and opens to its full width as it
+    /// leaves.
+    private var bar: some View {
+        let out = buds.isOut("count")
+        let gap = PieceLiquid.joined
+        return PieceLiquidGroup {
+            Button {
+                withAnimation(motion.morph) {
+                    isSelecting.toggle()
+                    if !isSelecting { selection = [] }
+                }
+            } label: {
+                PieceMorphText(text: isSelecting ? "Done" : "Select", font: .headline)
+                    .foregroundStyle(Self.ink)
+                    .padding(.horizontal, 20)
+                    .frame(height: 48)
+                    .pieceLiquid(.capsule, tint: Self.signal)
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { doneWidth = $0 }
+            // Laid out at Done's trailing end and under it, so at home the count sits inside Done.
+            .background(alignment: .trailing) {
+                if buds.contains("count") {
+                    countPill(out: out)
+                        .pieceBud(out: out, rest: CGSize(width: -(doneWidth + gap), height: 0), home: .zero)
+                }
+            }
+        }
+        // The pair stays centred while the count is out.
+        .offset(x: out ? (countWidth + gap) / 2 : 0)
+        .animation(motion.value, value: countWidth)
+    }
+
+    /// The live count. It rolls on the `value` spring: it is read, so it never overshoots.
+    private func countPill(out: Bool) -> some View {
+        Text("\(selection.count) Selected")
+            .font(.headline)
+            .monospacedDigit()
+            .contentTransition(.numericText(value: Double(selection.count)))
+            .animation(motion.value, value: selection.count)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 20)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { countWidth = $0 }
+            .pieceBudContent(out: out)
+            .frame(width: out ? max(countWidth, 48) : 48, height: 48)
+            .clipShape(.capsule)
+            .pieceLiquid(.capsule, interactive: false)
+    }
+}
+
+#Preview("Light") {
+    DragSelectGridExample()
+}
+
+#Preview("Dark") {
+    DragSelectGridExample()
+        .preferredColorScheme(.dark)
+}
+
+// MARK: - Piece motion
+//
+// The SwiftPieces motion language: shared spring tokens and gesture physics, with the same values in every
+// piece. Each piece carries a copy of only the parts it uses, so this file stands alone. Generated from
+// registry/foundation/PieceMotion.swift in the SwiftPieces repo; edit it there, not here.
+// swiftpieces-motion: 1.1.0 (core, follow, pressMath)
+
+/// The SwiftPieces motion language: five spring tiers, and a named role for every moment a piece moves,
+/// each with its Reduce Motion substitute.
+///
+/// Build one from the environment, `PieceMotion(reduceMotion: reduceMotion)`, and pick the role that names
+/// what just happened. Never animate the tracking of a finger: set gesture state directly in `onChanged`, so the
+/// surface stays under the finger, and spring only the release.
+private struct PieceMotion {
+    var reduceMotion = false
+
+    // Tiers. Overshoot and settle times are measured from rest with SwiftUI's Spring.
+    /// No overshoot, 90% in about 90ms. A press arriving under the finger.
+    static var tight: Spring { Spring(duration: 0.14, bounce: 0) }
+    /// About 2.8% overshoot, 90% in about 140ms. Snapping to a detent, page or segment.
+    static var responsive: Spring { Spring(duration: 0.32, bounce: 0.25) }
+    /// About 8.4% overshoot. Visible give: a release, a return from past an edge, a drag settling home.
+    static var elastic: Spring { Spring(duration: 0.42, bounce: 0.38) }
+    /// About 15% overshoot. A resolved action landing. At most once per interaction.
+    static var expressive: Spring { Spring(duration: 0.48, bounce: 0.48) }
+    /// About 1.5% overshoot, unhurried. Opening large surfaces and ambient change.
+    static var calm: Spring { Spring(duration: 0.5, bounce: 0.2) }
+
+    /// Reduce Motion: settles become this short spring with no overshoot.
+    private static var still: Animation { .spring(duration: 0.25, bounce: 0) }
+
+    // Roles.
+    /// Touch-down. Starts on the same frame and never bounces under the finger.
+    var press: Animation { .spring(Self.tight) }
+    /// The finger lifts off a pressed surface, which springs back through rest.
+    var release: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A dragged thing comes to rest. With a gesture's velocity, use `settle(velocity:from:to:)` instead.
+    var settle: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// Lands on a detent, page or segment.
+    var snap: Animation { reduceMotion ? Self.still : .spring(Self.responsive) }
+    /// A number, a chart value or anything else people read moves to its new value. Never overshoots, so it
+    /// never shows a value that isn't true.
+    var value: Animation { reduceMotion ? Self.still : .spring(duration: 0.35, bounce: 0) }
+    /// Comes back from past a limit: a pull beyond the edge, a value pushed against its bound.
+    var rebound: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A shape or container changes size, corner radius or form, with a little give at the end.
+    var morph: Animation { reduceMotion ? Self.still : .spring(duration: 0.4, bounce: 0.2) }
+    /// Something appears, opens or expands. Opening is a little slower than closing.
+    var reveal: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.calm) }
+    /// Something leaves, closes or collapses. Quick and firm, out of the way.
+    var dismiss: Animation { reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.3, bounce: 0.08) }
+    /// A resolved action lands: a check, a sent state, a reaction.
+    var success: Animation { reduceMotion ? .easeOut(duration: 0.24) : .spring(Self.expressive) }
+    /// A refused action. Firm, no wobble; `pieceShake` adds the movement.
+    var error: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.responsive) }
+    /// Slow ambient change. Loops themselves stop under Reduce Motion: check `allowsAmbient`.
+    var ambient: Animation { reduceMotion ? .easeInOut(duration: 0.3) : .spring(Self.calm) }
+
+    /// Loops, drifts, idle breathing and parallax run only when this is true.
+    var allowsAmbient: Bool { !reduceMotion }
+
+    /// A moving transition, or a plain fade under Reduce Motion.
+    func transition(_ transition: AnyTransition) -> AnyTransition {
+        reduceMotion ? .opacity : transition
+    }
+
+    /// For content replaced inside a container that stays put (a label, a glyph, a count): the old content
+    /// blurs out as the new one sharpens in. A fade under Reduce Motion.
+    @MainActor var swap: AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+}
+
+extension PieceMotion {
+    /// Follow-through: rank 0 leads, each later rank arrives a beat later on a slightly looser spring. Safe to reverse.
+    func follow(_ spring: Spring = PieceMotion.elastic, rank: Int) -> Animation {
+        guard !reduceMotion else { return .spring(duration: 0.25, bounce: 0) }
+        let k = Double(min(max(rank, 0), 6))
+        return .spring(duration: spring.duration + 0.04 * k, bounce: min(spring.bounce + 0.02 * k, 0.55))
+    }
+
+    /// One-shot entrances only: item `index` waits 30ms per place, capped at the seventh. Exits go together.
+    func cascade(_ animation: Animation, index: Int, step: Double = 0.03) -> Animation {
+        guard !reduceMotion, index > 0 else { return animation }
+        return animation.delay(step * Double(min(index, 7)))
+    }
+}
+
+extension PieceMotion {
+    /// About `depth` points per edge, not a fixed percentage: an icon sinks to 0.92, a pill 0.95, a card 0.985.
+    nonisolated static func pressScale(for size: CGSize, depth: CGFloat = 2.5) -> CGFloat {
+        let side = (max(size.width, 1) * max(size.height, 1)).squareRoot()
+        return min(max(1 - depth * 2 / side, 0.92), 0.985)
+    }
+
+    /// An anchor partway from the center toward the touch, so the press leans into the finger without tipping.
+    nonisolated static func pressAnchor(touch: CGPoint?, in size: CGSize, lean: CGFloat = 0.6) -> UnitPoint {
+        guard let touch, size.width > 0, size.height > 0 else { return .center }
+        let x = min(max(touch.x / size.width, 0), 1)
+        let y = min(max(touch.y / size.height, 0), 1)
+        return UnitPoint(x: 0.5 + (x - 0.5) * lean, y: 0.5 + (y - 0.5) * lean)
+    }
+}
+
+// swiftpieces-motion: end
+
+// MARK: - Piece liquid
+//
+// The SwiftPieces liquid glass language: glass shapes that merge through a neck, bubbles that bud out of
+// and melt back into each other, and the frosted fallback before iOS 26. Each piece carries a copy of only
+// the parts it uses, so this file stands alone. Generated from registry/foundation/PieceLiquid.swift in the
+// SwiftPieces repo; edit it there, not here. The rules are in LIQUID_GLASS.md.
+// swiftpieces-liquid: 1.8.0 (liquid, bud, morphText)
+
+/// The liquid glass language: one merge distance, two rest gaps, and the springs a bubble leaves and comes home on.
+///
+/// Glass shapes inside one `PieceLiquidGroup` melt into each other through a neck when they come within `merge`
+/// points. Parts of one control rest `joined`, inside that distance, so the neck holds; separate actions rest
+/// `apart`, outside it, so they only goo while one buds out of, or melts back into, another.
+private enum PieceLiquid {
+    /// Glass shapes closer than this share a neck.
+    static let merge: CGFloat = 20
+    /// The gap between parts of one control (a stepper's buttons, a progress pill and its stop): the neck holds,
+    /// short and smooth, about two thirds of the shapes' height at its waist. Joined parts read best at one height.
+    static let joined: CGFloat = 4
+    /// The gap between separate actions (menu items, confirm and cancel, chips): they rest as their own bubbles.
+    static let apart: CGFloat = 26
+    /// How far a bubble shrinks while it is home inside its parent.
+    static let homeScale: CGFloat = 0.72
+
+    /// A bubble leaving its parent: slow enough that the neck's stretch and snap read.
+    static func split(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.62, bounce: 0.22)
+    }
+
+    /// A bubble going home. No bounce: a bounce would carry it out through the far side of its parent.
+    static func home(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.5, bounce: 0)
+    }
+}
+
+/// A group of glass shapes that merge into one liquid surface. On iOS 26 it is a `GlassEffectContainer`; before
+/// that, and under Reduce Transparency, the shapes draw on their own and simply don't merge. `lift` adds the soft
+/// shadow liquid glass floats on in light mode.
+private struct PieceLiquidGroup<Content: View>: View {
+    var spacing: CGFloat = PieceLiquid.merge
+    var lift = true
+    @ViewBuilder var content: Content
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        container
+            .shadow(color: .black.opacity(lift && colorScheme == .light ? 0.07 : 0), radius: 18, y: 8)
+    }
+
+    @ViewBuilder private var container: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+/// One liquid glass shape: Liquid Glass on iOS 26, carrying `tint` as a solid colour and swelling under a press when
+/// `interactive`; a frosted Material with a light rim and a soft shadow before that; a solid fill under Reduce
+/// Transparency.
+///
+/// The tint is painted inside clear glass rather than tinting the glass. Tinted glass in a group bleeds its colour
+/// through every neck as a smear, so a red button would glow into the white pill it is joined to; painted inside,
+/// the colour stays crisp to the shape's edge, the necks between shapes are clear glass, and a tint change animates
+/// like any colour (tinted glass snaps).
+private struct PieceLiquidSurface<S: Shape>: ViewModifier {
+    var shape: S
+    var tint: Color?
+    var interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.pieceLiquidScale) private var scale
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            // Scaled as two parts, content and outline, about the same centre. A scaleEffect on a glass view inside a
+            // GlassEffectContainer shrinks the glass but leaves what it carries full size, pinned to its corner.
+            content
+                .background { shape.fill(tint ?? .clear) }
+                .scaleEffect(scale)
+                .glassEffect(glass, in: shape.scale(scale))
+        } else {
+            fallback(content).scaleEffect(scale)
+        }
+        #else
+        fallback(content).scaleEffect(scale)
+        #endif
+    }
+
+    #if compiler(>=6.2)
+    @available(iOS 26, *)
+    private var glass: Glass {
+        interactive ? Glass.regular.interactive() : .regular
+    }
+    #endif
+
+    private func fallback(_ content: Content) -> some View {
+        let dark = colorScheme == .dark
+        return content
+            .background {
+                if reduceTransparency {
+                    shape.fill(tint ?? (dark ? Color(white: 0.17) : Color(white: 0.97)))
+                } else {
+                    ZStack {
+                        shape.fill(.regularMaterial)
+                        if let tint { shape.fill(tint.opacity(0.88)) }
+                    }
+                }
+            }
+            .overlay { shape.stroke(Color.white.opacity(dark ? 0.14 : 0.7), lineWidth: 0.5) }
+            .shadow(color: .black.opacity(dark ? 0.32 : 0.08), radius: 10, y: 5)
+    }
+}
+
+private struct PieceLiquidScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1
+}
+
+private extension EnvironmentValues {
+    /// How much the liquid shapes below are scaled, about their own centres. Nested scales multiply.
+    var pieceLiquidScale: CGFloat {
+        get { self[PieceLiquidScaleKey.self] }
+        set { self[PieceLiquidScaleKey.self] = newValue }
+    }
+}
+
+private extension View {
+    /// Draws this view on a liquid glass `shape`. Put it inside a `PieceLiquidGroup` so it can merge with its neighbours.
+    func pieceLiquid<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(PieceLiquidSurface(shape: shape, tint: tint, interactive: interactive))
+    }
+
+    /// Scales the liquid glass shapes in this view, content and outline together, about their own centres. Use it
+    /// instead of `scaleEffect` on a glass view (a press, a lift, a swell): inside a group a plain `scaleEffect` shrinks
+    /// the glass but leaves its content full size and off centre. Animates like any other value.
+    func pieceLiquidScale(_ scale: CGFloat) -> some View {
+        transformEnvironment(\.pieceLiquidScale) { $0 *= scale }
+    }
+}
+
+/// The bud: how a bubble leaves and rejoins its parent, driven explicitly so every bubble shows the whole cycle.
+///
+/// A bubble is born at `home`, inside its parent, where the two glass shapes are one. It springs out to `rest`, and
+/// while it is inside the merge distance a neck holds it to the parent, thinning as it goes, until it snaps free.
+/// Going home it springs back on a spring with no bounce, the neck reaches out and re-forms, and only once it has
+/// melted all the way in is it removed. Both offsets are relative to where the bubble is laid out. Under Reduce
+/// Motion it stays at `rest`: its content fades and its glass closes in place.
+private struct PieceBud: ViewModifier {
+    var out: Bool
+    var rest: CGSize
+    var home: CGSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            // No travel. Inside a group glass ignores opacity, so the glass closes to nothing in place on the short
+            // Reduce Motion ease while its content fades; the opacity covers a bubble outside a group.
+            content
+                .pieceLiquidScale(out ? 1 : 0.001)
+                .opacity(out ? 1 : 0)
+                .offset(rest)
+        } else {
+            // The glass shrinks through `pieceLiquidScale`, never a plain scaleEffect (see there), then moves.
+            content
+                .pieceLiquidScale(out ? 1 : PieceLiquid.homeScale)
+                .offset(out ? rest : home)
+        }
+    }
+}
+
+/// A bubble's own content, on its own clock: gone the moment the bubble heads home, so it never rides over the
+/// parent's content, and arriving just after the bubble leaves.
+private struct PieceBudContent: ViewModifier {
+    var out: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .blur(radius: out ? 0 : 6)
+            .opacity(out ? 1 : 0)
+            .animation(out ? .easeOut(duration: 0.3).delay(0.1) : .easeOut(duration: 0.14), value: out)
+    }
+}
+
+private extension View {
+    /// Places a bubble at `rest` while `out`, and at `home` (inside its parent, shrunk) while not.
+    func pieceBud(out: Bool, rest: CGSize = .zero, home: CGSize) -> some View {
+        modifier(PieceBud(out: out, rest: rest, home: home))
+    }
+
+    /// Hides a bubble's icon or label while it is home. Put it on the content, inside the glass.
+    func pieceBudContent(out: Bool) -> some View {
+        modifier(PieceBudContent(out: out))
+    }
+}
+
+/// Which bubbles exist and which are out. A bubble is added home with no animation, sent out on the next frame,
+/// and called home before it is removed, so it always melts in rather than fading. Keep one in `@State`.
+@MainActor @Observable
+private final class PieceBuds {
+    private(set) var present: [String] = []
+    private(set) var out: Set<String> = []
+    /// The latest call for each bubble. A bloom or gather that has been overtaken (a bubble sent home while it was
+    /// still waiting to go out, or called out again while melting) leaves that bubble alone.
+    @ObservationIgnored private var turn: [String: Int] = [:]
+
+    func contains(_ id: String) -> Bool { present.contains(id) }
+    func isOut(_ id: String) -> Bool { out.contains(id) }
+
+    private func claim(_ ids: [String]) -> [String: Int] {
+        var mine: [String: Int] = [:]
+        for id in ids {
+            let next = (turn[id] ?? 0) + 1
+            turn[id] = next
+            mine[id] = next
+        }
+        return mine
+    }
+
+    /// Puts bubbles straight out at rest with no motion: a view's first frame, or a state restored.
+    func place(_ ids: [String]) {
+        _ = claim(ids)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            for id in ids where !present.contains(id) { present.append(id) }
+            out.formUnion(ids)
+        }
+    }
+
+    /// Adds bubbles home, then sends each out, `stagger` seconds apart, after an optional `delay`.
+    func bloom(_ ids: [String], reduceMotion: Bool, stagger: Double = 0.05, delay: Double = 0) async {
+        let mine = claim(ids)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            for id in ids where !present.contains(id) { present.append(id) }
+        }
+        try? await Task.sleep(for: .milliseconds(24 + Int(max(delay, 0) * 1000)))
+        let split = PieceLiquid.split(reduceMotion: reduceMotion)
+        for (i, id) in ids.enumerated() where turn[id] == mine[id] {
+            withAnimation(split.delay(reduceMotion ? 0 : Double(i) * stagger)) { _ = out.insert(id) }
+        }
+    }
+
+    /// Calls bubbles home, last first, then removes them once they have melted in.
+    func gather(_ ids: [String], reduceMotion: Bool, stagger: Double = 0.04) async {
+        let mine = claim(ids)
+        let home = PieceLiquid.home(reduceMotion: reduceMotion)
+        for (i, id) in ids.reversed().enumerated() {
+            withAnimation(home.delay(reduceMotion ? 0 : Double(i) * stagger)) { _ = out.remove(id) }
+        }
+        try? await Task.sleep(for: .milliseconds(Int((0.52 + Double(ids.count) * stagger) * 1000)))
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) { present.removeAll { ids.contains($0) && !out.contains($0) && turn[$0] == mine[$0] } }
+    }
+}
+
+/// A label that changes letter by letter: letters both strings share hold still, the rest blur out and the new ones
+/// blur in a few milliseconds apart. Under Reduce Motion it cross-fades. VoiceOver reads the whole string.
+///
+/// Only text whose letters stand on their own is cut into letters: Latin, Greek, Cyrillic, CJK, digits and symbols.
+/// Those letters are laid out left to right whatever the layout direction, the order they read in, so "1.5×" stays
+/// "1.5×" in an Arabic or Hebrew interface instead of coming out backwards. Text in a right-to-left script, or in one
+/// whose letters join or reorder (Arabic, Hebrew, Devanagari, Thai and their neighbours), can't be cut apart without
+/// breaking it, so it changes as one: the old string blurs out where it stood while the new one blurs in.
+private struct PieceMorphText: View {
+    var text: String
+    var font: Font = .body.weight(.semibold)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        // The morphing label at its full size when it fits. When it doesn't (a long label at an accessibility text
+        // size, a narrow screen), the same words wrap onto a second line and shrink a little instead of running past
+        // the screen's edge; that one changes as a whole rather than letter by letter. A single word never splits
+        // across lines: it stays on one and shrinks further.
+        let oneWord = !text.contains(where: \.isWhitespace)
+        ViewThatFits(in: .horizontal) {
+            morphing.fixedSize()
+            Text(text)
+                .lineLimit(oneWord ? 1 : 2)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(oneWord ? 0.5 : 0.75)
+                .fixedSize(horizontal: false, vertical: true)
+                .id(text)
+                .transition(transition(0, scale: 0.9))
+        }
+        .font(font)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+
+    @ViewBuilder private var morphing: some View {
+        if Self.splits(text) {
+            let glyphs = Array(text)
+            HStack(spacing: 0) {
+                ForEach(glyphs.indices, id: \.self) { i in
+                    Text(String(glyphs[i]))
+                        .id("\(i)\(glyphs[i])")
+                        .transition(transition(i, scale: 0.6))
+                }
+            }
+            // The letters' reading order, not the layout's: an HStack lays its children out backwards under a
+            // right-to-left layout.
+            .environment(\.layoutDirection, .leftToRight)
+        } else {
+            ZStack(alignment: .leading) {
+                Text(text)
+                    .id(text)
+                    .transition(transition(0, scale: 0.9))
+            }
+        }
+    }
+
+    private func transition(_ i: Int, scale: CGFloat) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return AnyTransition(.blurReplace(.downUp)).combined(with: .scale(scale: scale, anchor: .bottom))
+            .animation(.spring(duration: 0.42, bounce: 0.3).delay(Double(i) * 0.022))
+    }
+
+    /// Whether `text` can be cut into letters that each read left to right on their own: no right-to-left script, no
+    /// script that joins or reorders its letters, and no bidirectional control characters.
+    private static func splits(_ text: String) -> Bool {
+        !text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x0590...0x08FF, // Hebrew, Arabic, Syriac, Thaana, NKo, Samaritan, Mandaic
+                 0x0900...0x0DFF, // Devanagari to Sinhala
+                 0x0E00...0x0FFF, // Thai, Lao, Tibetan
+                 0x1000...0x109F, // Myanmar
+                 0x1780...0x17FF, // Khmer
+                 0xA8E0...0xA8FF, // Devanagari Extended
+                 0xFB1D...0xFDFF, // Hebrew and Arabic presentation forms
+                 0xFE70...0xFEFF, // Arabic presentation forms B
+                 0x200E...0x200F, 0x202A...0x202E, 0x2066...0x2069, // bidirectional marks, embeddings and isolates
+                 0x10800...0x10FFF, // historic right-to-left scripts
+                 0x1E800...0x1EFFF: // Adlam and other right-to-left scripts
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}
+
+// swiftpieces-liquid: end

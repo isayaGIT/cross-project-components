@@ -8,15 +8,18 @@ public struct MomentSingleMoment: View {
         public let id: String
         public var name: String
         public var avatarURL: URL?
+        public var fallbackSymbol: String
 
         public init(
             id: String,
             name: String,
-            avatarURL: URL? = nil
+            avatarURL: URL? = nil,
+            fallbackSymbol: String = "person.crop.circle.fill"
         ) {
             self.id = id
             self.name = name
             self.avatarURL = avatarURL
+            self.fallbackSymbol = fallbackSymbol
         }
     }
 
@@ -107,28 +110,18 @@ public struct MomentSingleMoment: View {
     private let onComment: (String) -> Void
     private let onAuthorTap: (() -> Void)?
     private let onMediaTap: ((Int) -> Void)?
-    private let fontName: String?
-    private let fontDesign: Font.Design
-    private let authorNameFontSize: CGFloat
-    private let contentFontSize: CGFloat
-    private let metadataFontSize: CGFloat
-    private let likesFontSize: CGFloat
-    private let commentFontSize: CGFloat
-    private let composerFontSize: CGFloat
-    private let actionFontSize: CGFloat
-    private let accentColor: Color
-    private let textColor: Color
-    private let secondaryTextColor: Color
-    private let backgroundColor: Color
-    private let interactionBackgroundColor: Color
-    private let fieldBackgroundColor: Color
-    private let borderColor: Color
-    private let borderWidth: CGFloat
-    private let containerShape: AnyShape
-    private let avatarShape: AnyShape
-    private let interactionPanelShape: AnyShape
-    private let composerShape: AnyShape
-    private let mediaShape: ImgThumbnail.ShapeStyle
+    private let authorNameFont: Font
+    private let contentFont: Font
+    private let likesFont: Font
+    private let commentAuthorFont: Font
+    private let commentContentFont: Font
+    private let commentReplyLabelFont: Font
+    private let commentDateFont: Font
+    private let metadataFont: Font
+    private let commentComposerFont: Font
+    private let commentActionFont: Font
+    private let interactionPanelBorder: ((CGRect) -> AnyView)?
+    private let interactionDivider: ((CGRect) -> AnyView)?
     private let palette = ComponentDesignPalette.warmEmber
 
     @State private var showsCommentComposer = false
@@ -146,57 +139,25 @@ public struct MomentSingleMoment: View {
         onToggleLike: @escaping (Bool) -> Void,
         onComment: @escaping (String) -> Void,
         onAuthorTap: (() -> Void)? = nil,
-        onMediaTap: ((Int) -> Void)? = nil,
-        fontName: String? = nil,
-        fontDesign: Font.Design = .default,
-        authorNameFontSize: CGFloat = 15,
-        contentFontSize: CGFloat = 15,
-        metadataFontSize: CGFloat = 11,
-        likesFontSize: CGFloat = 12,
-        commentFontSize: CGFloat = 13,
-        composerFontSize: CGFloat = 14,
-        actionFontSize: CGFloat = 14,
-        accentColor: Color = ComponentDesignPalette.warmEmber.accent,
-        textColor: Color = ComponentDesignPalette.warmEmber.textColor,
-        secondaryTextColor: Color = ComponentDesignPalette.warmEmber.secondaryTextColor,
-        backgroundColor: Color = ComponentDesignPalette.warmEmber.canvas,
-        interactionBackgroundColor: Color = ComponentDesignPalette.warmEmber.fieldBackground.opacity(0.72),
-        fieldBackgroundColor: Color = ComponentDesignPalette.warmEmber.fieldBackground,
-        borderColor: Color = ComponentDesignPalette.warmEmber.borderColor,
-        borderWidth: CGFloat = 0.5,
-        containerShape: AnyShape = AnyShape(RoundedRectangle(cornerRadius: 0, style: .continuous)),
-        avatarShape: AnyShape = AnyShape(RoundedRectangle(cornerRadius: 5, style: .continuous)),
-        interactionPanelShape: AnyShape = AnyShape(RoundedRectangle(cornerRadius: 7, style: .continuous)),
-        composerShape: AnyShape = AnyShape(RoundedRectangle(cornerRadius: 9, style: .continuous)),
-        mediaShape: ImgThumbnail.ShapeStyle = .square
+        onMediaTap: ((Int) -> Void)? = nil
     ) {
         self.model = model
         self.onToggleLike = onToggleLike
         self.onComment = onComment
         self.onAuthorTap = onAuthorTap
         self.onMediaTap = onMediaTap
-        self.fontName = fontName
-        self.fontDesign = fontDesign
-        self.authorNameFontSize = authorNameFontSize
-        self.contentFontSize = contentFontSize
-        self.metadataFontSize = metadataFontSize
-        self.likesFontSize = likesFontSize
-        self.commentFontSize = commentFontSize
-        self.composerFontSize = composerFontSize
-        self.actionFontSize = actionFontSize
-        self.accentColor = accentColor
-        self.textColor = textColor
-        self.secondaryTextColor = secondaryTextColor
-        self.backgroundColor = backgroundColor
-        self.interactionBackgroundColor = interactionBackgroundColor
-        self.fieldBackgroundColor = fieldBackgroundColor
-        self.borderColor = borderColor
-        self.borderWidth = max(0, borderWidth)
-        self.containerShape = containerShape
-        self.avatarShape = avatarShape
-        self.interactionPanelShape = interactionPanelShape
-        self.composerShape = composerShape
-        self.mediaShape = mediaShape
+        self.authorNameFont = .system(size: 15, weight: .semibold)
+        self.contentFont = .system(size: 15)
+        self.likesFont = .system(size: 12)
+        self.commentAuthorFont = .system(size: 13, weight: .semibold)
+        self.commentContentFont = .system(size: 13)
+        self.commentReplyLabelFont = .system(size: 11)
+        self.commentDateFont = .system(size: 11)
+        self.metadataFont = .system(size: 11)
+        self.commentComposerFont = .system(size: 14)
+        self.commentActionFont = .system(size: 14, weight: .medium)
+        self.interactionPanelBorder = nil
+        self.interactionDivider = nil
     }
 
     public var body: some View {
@@ -211,8 +172,8 @@ public struct MomentSingleMoment: View {
                 HStack(alignment: .top, spacing: 8) {
                     Button { onAuthorTap?() } label: {
                         Text(model.author.name)
-                            .font(componentFont(size: authorNameFontSize, weight: .semibold))
-                            .foregroundStyle(accentColor)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(palette.accent)
                             .multilineTextAlignment(.leading)
                     }
                     .buttonStyle(.plain)
@@ -221,20 +182,21 @@ public struct MomentSingleMoment: View {
 
                 if !model.text.isEmpty {
                     Text(model.text)
-                        .font(componentFont(size: contentFontSize))
-                        .foregroundStyle(textColor)
+                        .font(.system(size: 15))
+                        .foregroundStyle(palette.textColor)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 3)
                 }
+                // todo 我需要文本内容和media之间行距大一点
                 if !model.media.isEmpty {
                     mediaGrid
-                        .padding(.top, 12)
+                        .padding(.top, 9)
                 }
 
                 HStack(alignment: .center, spacing: 8) {
                     if let mood = model.mood, !mood.isEmpty {
-                        Text(mood).font(componentFont(size: metadataFontSize))
+                        Text(mood).font(.system(size: 12))
                     }
                     if let location = model.location, !location.isEmpty {
                         Label(location, systemImage: "mappin.and.ellipse")
@@ -255,7 +217,7 @@ public struct MomentSingleMoment: View {
                                             }
                                         } label: {
                                             Circle()
-                                                .fill(page == min(mediaPage, pageCount - 1) ? accentColor : secondaryTextColor.opacity(0.35))
+                                                .fill(page == min(mediaPage, pageCount - 1) ? palette.accent : palette.secondaryTextColor.opacity(0.35))
                                                 .frame(width: page == min(mediaPage, pageCount - 1) ? 7 : 5, height: page == min(mediaPage, pageCount - 1) ? 7 : 5)
                                                 .frame(width: 8, height: 20)
                                                 .contentShape(Rectangle())
@@ -289,14 +251,14 @@ public struct MomentSingleMoment: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(secondaryTextColor)
+                            .foregroundStyle(palette.secondaryTextColor)
                             .frame(width: 30, height: 24)
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("动态操作")
                 }
-                .font(componentFont(size: metadataFontSize))
-                .foregroundStyle(secondaryTextColor)
+                .font(.system(size: 11))
+                .foregroundStyle(palette.secondaryTextColor)
                 .padding(.top, 9)
 
                 if !model.likes.isEmpty || !model.comments.isEmpty {
@@ -308,10 +270,10 @@ public struct MomentSingleMoment: View {
                     HStack(spacing: 8) {
                         TextField("评论…", text: $commentDraft, axis: .vertical)
                             .lineLimit(1...4)
-                            .font(componentFont(size: composerFontSize))
+                            .font(.system(size: 14))
                             .padding(.horizontal, 11)
                             .padding(.vertical, 8)
-                            .background(fieldBackgroundColor, in: composerShape)
+                            .background(palette.fieldBackground, in: RoundedRectangle(cornerRadius: 9))
                         Button("发送") {
                             let value = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !value.isEmpty else { return }
@@ -319,8 +281,8 @@ public struct MomentSingleMoment: View {
                             commentDraft = ""
                             showsCommentComposer = false
                         }
-                        .font(componentFont(size: actionFontSize, weight: .semibold))
-                        .foregroundStyle(accentColor)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(palette.accent)
                         .disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     .padding(.top, 9)
@@ -330,8 +292,8 @@ public struct MomentSingleMoment: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(backgroundColor, in: containerShape)
-        .overlay { containerShape.stroke(borderColor, lineWidth: borderWidth) }
+        .background(palette.canvas)
+        .overlay(alignment: .bottom) { Rectangle().fill(palette.borderColor.opacity(0.7)).frame(height: 0.5) }
         #if os(iOS)
         .fullScreenCover(isPresented: $showsImageViewer) {
             ImgView(
@@ -356,7 +318,7 @@ public struct MomentSingleMoment: View {
                             .textSelection(.enabled)
                     }
                 }
-                .foregroundStyle(textColor)
+                .foregroundStyle(palette.textColor)
             }
         }
         #endif
@@ -453,7 +415,7 @@ public struct MomentSingleMoment: View {
                     ImgThumbnail(
                         url: item.previewURL ?? item.url,
                         size: CGSize(width: tileSize, height: count == 1 ? min(220, tileSize) : tileSize),
-                        shape: mediaShape,
+                        shape: .square,
                         placeholder: Image(systemName: "photo"),
                         showsLoadingIndicator: true
                     )
@@ -471,12 +433,12 @@ public struct MomentSingleMoment: View {
             if !model.likes.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "heart.fill")
-                        .font(componentFont(size: likesFontSize, weight: .medium))
-                        .foregroundStyle(accentColor)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(palette.accent)
                         .padding(.top, 3)
                     Text(model.likes.map(\.name).joined(separator: ", "))
-                        .font(componentFont(size: likesFontSize, weight: .medium))
-                        .foregroundStyle(accentColor)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(palette.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 9)
@@ -484,7 +446,7 @@ public struct MomentSingleMoment: View {
             }
 
             if !model.likes.isEmpty && !model.comments.isEmpty {
-                Rectangle().fill(borderColor.opacity(0.7)).frame(height: borderWidth)
+                Rectangle().fill(palette.borderColor.opacity(0.7)).frame(height: 0.5)
             }
 
             if !model.comments.isEmpty {
@@ -493,17 +455,22 @@ public struct MomentSingleMoment: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text(comment.author.name)
-                                    .foregroundStyle(accentColor)
+                                    .foregroundStyle(palette.accent)
                                     .fontWeight(.semibold)
                                 if let target = comment.replyTo {
-                                    Text("replied to").foregroundStyle(secondaryTextColor)
-                                    Text(target.name).foregroundStyle(accentColor).fontWeight(.semibold)
+                                    Text("replied to").foregroundStyle(palette.secondaryTextColor)
+                                    Text(target.name).foregroundStyle(palette.accent).fontWeight(.semibold)
                                 }
-                                Text(":").foregroundStyle(textColor)
-                                Text(comment.text).foregroundStyle(textColor)
+                                Text(":").foregroundStyle(palette.textColor)
+                                Text(comment.text).foregroundStyle(palette.textColor)
                             }
-                            .font(componentFont(size: commentFontSize))
+                            .font(.system(size: 13))
                             .fixedSize(horizontal: false, vertical: true)
+                            if let date = comment.createdAt {
+                                Text(Self.relativeDate(date))
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(palette.secondaryTextColor)
+                            }
                         }
                     }
                 }
@@ -512,8 +479,7 @@ public struct MomentSingleMoment: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(interactionBackgroundColor, in: interactionPanelShape)
-        .overlay { interactionPanelShape.stroke(borderColor.opacity(0.7), lineWidth: borderWidth) }
+        .background(palette.fieldBackground.opacity(0.72), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
     @ViewBuilder
@@ -521,29 +487,30 @@ public struct MomentSingleMoment: View {
         Group {
             if let url = person.avatarURL {
                 LazyImage(url: url) { state in
-                    if let image = state.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        Color.clear
-                    }
+                    if let image = state.image { image.resizable().aspectRatio(contentMode: .fill) }
+                    else { fallbackAvatar(person) }
                 }
             } else {
-                Color.clear
+                fallbackAvatar(person)
             }
         }
         .frame(width: size, height: size)
-        .clipShape(avatarShape)
+        .clipShape(RoundedRectangle(cornerRadius: size < 24 ? 3 : 5, style: .continuous))
         .accessibilityHidden(true)
     }
 
-    private func componentFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        if let fontName, !fontName.isEmpty {
-            return .custom(fontName, size: size).weight(weight)
+    private func fallbackAvatar(_ person: Person) -> some View { // todo 删掉 不需要这个逻辑 这里avatarhandle
+        ZStack {
+            palette.previewAccentSurface
+            Image(systemName: person.fallbackSymbol)
+                .resizable()
+                .scaledToFit()
+                .padding(4)
+                .foregroundStyle(palette.accent)
         }
-        return .system(size: size, weight: weight, design: fontDesign)
     }
 
-    private static func relativeDate(_ date: Date) -> String {// todo 删掉 不需要这个逻辑
+    private static func relativeDate(_ date: Date) -> String {
         let seconds = max(0, Int(Date.now.timeIntervalSince(date)))
         if seconds < 60 { return "刚刚" }
         if seconds < 3600 { return "\(seconds / 60)分钟前" }

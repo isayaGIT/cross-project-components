@@ -1,0 +1,9 @@
+可传入参数:
+icon image
+title text
+title font
+title fontsize
+subtitle text(can be nil)
+subtitle font=
+subtitle fontsize
+status (unavailable, ready, error)

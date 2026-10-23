@@ -1,0 +1,1819 @@
+// Copyright (c) 2026 Saivion Hayes
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, and distribute the Software as part of
+// an application, website, or product, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// Commons Clause Restriction
+//
+// You may use this Software, including for any commercial purpose, so long as
+// you do not sell, sublicense, or redistribute the components themselves, whether
+// alone, in a bundle, or as a ported version.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+import Contacts
+import MapKit
+import SwiftUI
+
+/// Address entry with type-ahead suggestions that resolve to a structured, verified address.
+///
+/// The field is a liquid glass shape, and what it shows buds out of it: the suggestion list pours down out of the
+/// field and rests apart from it, the clear (or searching) bubble comes out of its end, and the bubble that spins
+/// while a pick resolves comes out of the list beside the chosen row. Each melts back into where it came from.
+///
+/// Typing searches after a short pause (three characters or more). Each new keystroke cancels the search
+/// in flight, so a slow answer for an older query never replaces a newer one. Picking a suggestion looks up
+/// the full address; when it arrives, `address` is set, `text` becomes the address's first line (usually the
+/// street) and the locality shows under it. Editing the text again clears `address`. Location permission is
+/// never requested: suggestions come from the query alone, optionally biased by `region`.
+///
+/// ```swift
+/// @State private var query = ""
+/// @State private var address: AddressField.Address?
+///
+/// AddressField("Delivery address", text: $query, address: $address, countries: ["US", "CA"])
+/// ```
+///
+/// - Parameters:
+///   - label: The placeholder shown while the field is empty, and its accessibility label.
+///   - text: Bound text. Set by typing, and to the address's first line once a suggestion resolves.
+///   - address: The resolved address, or `nil` while there is none. Setting it from outside (a saved address) fills the field and skips searching. Editing the text sets it back to `nil`.
+///   - region: Biases suggestions toward an area, such as the city a store delivers in. `nil` searches everywhere, starting with the device's region.
+///   - source: Where suggestions and addresses come from. `nil` (the default) uses MapKit. Pass your own for a geocoding backend, previews or tests.
+///   - countries: ISO 3166 country codes that are accepted, such as `["US", "CA"]`. Suggestions clearly in another country are left out, and a picked address outside the list shows an inline error instead of being set. Empty accepts every country.
+///   - allowsUnverified: When `true`, a "Use as typed" row appears when there are no matches or a lookup fails, and picking it sets an address with `isVerified == false` holding only the typed text.
+///   - style: Colors and field metrics. Defaults to the SwiftPieces house palette, adapting to light and dark.
+public struct AddressField: View {
+    /// A resolved address. Parts that a lookup did not return are `nil`.
+    public struct Address: Hashable, Sendable, Codable {
+        /// The street line with the house number, formatted for the country, such as "1 Infinite Loop" or "Hauptstraße 5".
+        public let street: String?
+        /// City, town or locality.
+        public let city: String?
+        /// State, province, prefecture or county, as the country abbreviates it ("CA", "ON").
+        public let state: String?
+        /// Postal or ZIP code.
+        public let postalCode: String?
+        /// Country name, localized.
+        public let country: String?
+        /// ISO 3166-1 alpha-2 country code in upper case, such as "US".
+        public let isoCountryCode: String?
+        /// Latitude of the address, when known.
+        public let latitude: Double?
+        /// Longitude of the address, when known.
+        public let longitude: Double?
+        /// The whole address on one line, formatted for its country.
+        public let formatted: String
+        /// `true` when the address came from a lookup; `false` for text the person chose to use as typed.
+        public let isVerified: Bool
+
+        /// Builds an address. `formatted` is composed from the parts, in the country's postal format, when you leave it `nil`.
+        public init(street: String? = nil, city: String? = nil, state: String? = nil, postalCode: String? = nil, country: String? = nil, isoCountryCode: String? = nil, coordinate: CLLocationCoordinate2D? = nil, formatted: String? = nil, isVerified: Bool = true) {
+            self.street = street.nonBlank
+            self.city = city.nonBlank
+            self.state = state.nonBlank
+            self.postalCode = postalCode.nonBlank
+            self.country = country.nonBlank
+            self.isoCountryCode = isoCountryCode.nonBlank?.uppercased()
+            self.latitude = coordinate?.latitude
+            self.longitude = coordinate?.longitude
+            let parts = Self.mailingLines(street: self.street, city: self.city, state: self.state, postalCode: self.postalCode, country: self.country, isoCountryCode: self.isoCountryCode)
+            self.formatted = formatted.nonBlank?.collapsingSpaces ?? parts.joined(separator: ", ")
+            self.isVerified = isVerified
+        }
+
+        /// The coordinate, when the lookup returned one.
+        public var coordinate: CLLocationCoordinate2D? {
+            guard let latitude, let longitude else { return nil }
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+
+        /// The address as the lines of a mailing label, ordered and formatted for its country (for example the postal
+        /// code before the city in Germany). Falls back to `formatted` when there are no parts.
+        public var mailingLines: [String] {
+            let lines = Self.mailingLines(street: street, city: city, state: state, postalCode: postalCode, country: country, isoCountryCode: isoCountryCode)
+            return lines.isEmpty ? [formatted] : lines
+        }
+
+        /// What the field shows once this address is set: the first line (usually the street).
+        var fieldText: String { street ?? mailingLines.first ?? formatted }
+
+        /// Everything after the first line, on one line, for the field's second line. The country is left out
+        /// when it is the device's own region, the way the system shortens addresses.
+        var localityLine: String? {
+            var lines = Array(mailingLines.dropFirst())
+            if lines.count > 1, let country, lines.last == country, let code = isoCountryCode, code == Locale.current.region?.identifier {
+                lines.removeLast()
+            }
+            return lines.isEmpty ? nil : lines.joined(separator: ", ")
+        }
+
+        private static func mailingLines(street: String?, city: String?, state: String?, postalCode: String?, country: String?, isoCountryCode: String?) -> [String] {
+            guard [street, city, state, postalCode, country].contains(where: { $0 != nil }) else { return [] }
+            let postal = CNMutablePostalAddress()
+            postal.street = street ?? ""
+            postal.city = city ?? ""
+            postal.state = state ?? ""
+            postal.postalCode = postalCode ?? ""
+            postal.country = country ?? ""
+            postal.isoCountryCode = isoCountryCode?.lowercased() ?? ""
+            return CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+                .split(whereSeparator: \.isNewline)
+                .map { String($0).collapsingSpaces }
+                .filter { !$0.isEmpty }
+        }
+    }
+
+    /// One row in the suggestion list.
+    public struct Suggestion: Identifiable, Hashable, Sendable {
+        /// Stable identity. Also how your `Source.resolve` finds what it needs.
+        public let id: String
+        /// The first line, such as "1 Infinite Loop".
+        public let title: String
+        /// The locality line, such as "Cupertino, CA, United States". May be empty.
+        public let subtitle: String
+        /// Runs of `title` that match the query, drawn in the label colour with the rest of the title in the secondary
+        /// colour. Empty picks out the query where it appears.
+        public let highlights: [Range<String.Index>]
+
+        public init(id: String? = nil, title: String, subtitle: String = "", highlights: [Range<String.Index>] = []) {
+            self.id = id ?? "\(title)\n\(subtitle)"
+            self.title = title
+            self.subtitle = subtitle
+            self.highlights = highlights
+        }
+    }
+
+    /// Where suggestions and addresses come from. The field cancels a call whose result is no longer wanted.
+    public struct Source: Sendable {
+        /// Returns suggestions for a trimmed query of three characters or more.
+        public var suggest: @MainActor @Sendable (_ query: String) async throws -> [Suggestion]
+        /// Resolves a suggestion from the latest `suggest` call into an address.
+        public var resolve: @MainActor @Sendable (_ suggestion: Suggestion) async throws -> Address
+
+        public init(suggest: @escaping @MainActor @Sendable (_ query: String) async throws -> [Suggestion], resolve: @escaping @MainActor @Sendable (_ suggestion: Suggestion) async throws -> Address) {
+            self.suggest = suggest
+            self.resolve = resolve
+        }
+
+        /// MapKit address search, biased toward `region`. Each call to this makes a new search session, so create it once
+        /// (for example in `@State`) rather than in `body`. The field's default already does this.
+        @MainActor public static func mapKit(region: MKCoordinateRegion? = nil) -> Source {
+            let search = MapKitAddressSearch()
+            return Source(
+                suggest: { try await search.suggestions(for: $0, region: region) },
+                resolve: { try await search.resolve($0) }
+            )
+        }
+    }
+
+    /// Colors and metrics. `.standard` is the house palette.
+    public struct Style: Sendable {
+        /// The glass tint of the field and the suggestion list. `.clear`, the default, leaves them neutral glass.
+        public var field: Color
+        /// Typed text and suggestion titles.
+        public var label: Color
+        /// Placeholder, icons, the locality line and suggestion subtitles.
+        public var secondaryLabel: Color
+        /// The 2pt ring while focused.
+        public var focusRing: Color
+        /// The highlighted and pressed suggestion row, a quiet wash inside the glass list.
+        public var highlight: Color
+        /// The verified check block.
+        public var success: Color
+        /// Lookup errors: the warning mark on a failed row and the tint of its retry bubble. Butter by default.
+        public var error: Color
+        /// Glyphs on solid blocks and tinted glass.
+        public var ink: Color
+        /// The pin at the front of the field: the one accent at rest.
+        public var pin: Color
+        /// Suggestion tiles: solid blocks behind each suggestion's pin, which is then drawn in ink. Each suggestion keeps
+        /// the same block (picked from its text), so one color gives uniform tiles. Empty, the default, draws the pin
+        /// without a tile, like the other rows' glyphs.
+        public var tiles: [Color]
+        /// Minimum field height, and the diameter of the bubbles that bud beside the field and the list. Grows with
+        /// Dynamic Type and the locality line.
+        public var height: CGFloat
+        /// Field corner radius. Rows use a smaller radius that follows it.
+        public var cornerRadius: CGFloat
+
+        /// Pass only what you want to change; `nil` keeps the house palette value.
+        public init(field: Color? = nil, label: Color? = nil, secondaryLabel: Color? = nil, focusRing: Color? = nil, highlight: Color? = nil, success: Color? = nil, error: Color? = nil, ink: Color? = nil, pin: Color? = nil, tiles: [Color]? = nil, height: CGFloat = 56, cornerRadius: CGFloat = 18) {
+            self.field = field ?? .clear
+            self.label = label ?? adaptive(light: 0x141414, dark: 0xF4F3EF)
+            self.secondaryLabel = secondaryLabel ?? adaptive(light: 0x5C5A56, dark: 0xA6A49F)
+            self.focusRing = focusRing ?? adaptive(light: 0xFF0000, dark: 0xFF0000)
+            self.highlight = highlight ?? Color.primary.opacity(0.08)
+            self.success = success ?? adaptive(light: 0xA9DCB7, dark: 0xA9DCB7)
+            self.error = error ?? adaptive(light: 0xFFD976, dark: 0xFFD976)
+            self.ink = ink ?? adaptive(light: 0x141414, dark: 0x141414)
+            self.pin = pin ?? adaptive(light: 0xFF0000, dark: 0xFF0000)
+            self.tiles = tiles ?? []
+            self.height = max(height, 44)
+            self.cornerRadius = cornerRadius
+        }
+
+        public static let standard = Style()
+
+        /// A stable tile per suggestion, so a row never changes color as the list refines. `nil` when there are no tiles.
+        func tile(for key: String) -> Color? {
+            guard !tiles.isEmpty else { return nil }
+            var hash: UInt64 = 5381
+            for scalar in key.lowercased().unicodeScalars { hash = (hash &* 33) &+ UInt64(scalar.value) }
+            return tiles[Int(hash % UInt64(tiles.count))]
+        }
+    }
+
+    private enum Status: Equatable {
+        case idle
+        case loaded
+        case empty
+        case failed(String)
+    }
+
+    private struct Failure: Equatable {
+        let id: Suggestion.ID
+        let message: String
+        /// False for an address outside `countries`: trying again would give the same answer.
+        let canRetry: Bool
+    }
+
+    private struct SearchKey: Equatable {
+        let query: String
+        let attempt: Int
+    }
+
+    /// Queries shorter than this (after trimming) don't search.
+    private static let minimumQueryLength = 3
+    nonisolated private static let typedRowID = "\u{0}typed"
+    nonisolated private static let failedRowID = "\u{0}failed"
+    /// The list's own coordinates, where each row reports its middle so the row bubble can sit level with it.
+    nonisolated private static let listSpace = "AddressField.list"
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @FocusState private var isFocused: Bool
+    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 32
+    @ScaledMetric(relativeTo: .body) private var badgeSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 52
+    @Binding private var text: String
+    @Binding private var address: Address?
+    /// Lives for the field's lifetime; its completer is created on the first search.
+    @State private var mapKit = MapKitAddressSearch()
+    @State private var suggestions: [Suggestion] = []
+    @State private var status: Status = .idle
+    @State private var isLoading = false
+    /// True after an edit, false once the person leaves the field, presses Escape or picks.
+    @State private var isActive = false
+    @State private var highlightedID: String?
+    @State private var resolvingID: Suggestion.ID?
+    @State private var failure: Failure?
+    @State private var resolveTask: Task<Void, Never>?
+    @State private var attempt = 0
+    /// The last value written to `text` by the field itself, so the change it causes is not treated as an edit.
+    @State private var programmatic: String?
+    @State private var announcedCount: Int?
+    @State private var pickTick = 0
+    @State private var moveTick = 0
+    @State private var successTick = 0
+    @State private var errorTick = 0
+    /// The address the field itself last resolved. Only that one pops its check with the success haptic; one set from
+    /// outside plays no haptic, so its check lands on a snap.
+    @State private var resolvedHere: Address?
+    /// The accessory bubble beside the field, the suggestion list and the row bubble beside the list: each out while
+    /// it has something to show, melted into its parent otherwise.
+    @State private var buds = PieceBuds()
+    /// The rows the list last showed, so a list on its way home melts as it last looked instead of emptying first.
+    @State private var keptRows: [Row] = []
+    /// Each row's middle in the list's coordinates.
+    @State private var rowMids: [String: CGFloat] = [:]
+    /// The row the row bubble sits beside, kept while it melts home.
+    @State private var bubbleRow: String?
+
+    private let label: String
+    private let region: MKCoordinateRegion?
+    private let source: Source?
+    private let countries: Set<String>
+    private let allowsUnverified: Bool
+    private let style: Style
+
+    public init(_ label: String, text: Binding<String>, address: Binding<Address?>, region: MKCoordinateRegion? = nil, countries: Set<String> = [], allowsUnverified: Bool = true, style: Style = .standard) {
+        self.init(label, text: text, address: address, region: region, source: nil, countries: countries, allowsUnverified: allowsUnverified, style: style)
+    }
+
+    public init(_ label: String, text: Binding<String>, address: Binding<Address?>, source: Source, countries: Set<String> = [], allowsUnverified: Bool = true, style: Style = .standard) {
+        self.init(label, text: text, address: address, region: nil, source: source, countries: countries, allowsUnverified: allowsUnverified, style: style)
+    }
+
+    private init(_ label: String, text: Binding<String>, address: Binding<Address?>, region: MKCoordinateRegion?, source: Source?, countries: Set<String>, allowsUnverified: Bool, style: Style) {
+        self.label = label
+        self._text = text
+        self._address = address
+        self.region = region
+        self.source = source
+        self.countries = Set(countries.map { $0.uppercased() })
+        self.allowsUnverified = allowsUnverified
+        self.style = style
+    }
+
+    private var motion: PieceMotion { PieceMotion(reduceMotion: reduceMotion) }
+    private var query: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// What the search task follows. Leaving the field doesn't change it, so results survive a blur (and a pick in flight).
+    private var searchQuery: String { address == nil ? query : "" }
+
+    public var body: some View {
+        let motion = self.motion
+        let rows = self.rows
+        let content = PieceLiquidGroup {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    // Laid out first, so at home the bubble sits under the field's end and melts into it.
+                    if buds.contains("accessory") { accessoryBubble }
+                    field
+                        .padding(.trailing, column)
+                }
+                // Above the list, so the list at home slips under the field.
+                .zIndex(1)
+                if buds.contains("list") {
+                    list(rows.isEmpty ? keptRows : rows)
+                }
+            }
+        }
+        .fontWeight(.semibold)
+        .opacity(isEnabled ? 1 : 0.45)
+        // When several of these change in one update the first listed wins, so a failed lookup keeps the error role as
+        // its row grows. The list refining as you type is text being read and moves on `value`, which never overshoots,
+        // so nothing below an inline list ever wobbles. A pick answers with a snap: the other rows dimming.
+        .animation(failure == nil ? motion.dismiss : motion.error, value: failure)
+        .animation(motion.value, value: rows.map(\.id))
+        .animation(motion.snap, value: resolvingID)
+        return budding(searching(content), rows: rows)
+    }
+
+    /// Haptics, the search task and the field's own state.
+    private func searching(_ content: some View) -> some View {
+        content
+            .sensoryFeedback(.selection, trigger: moveTick)
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: pickTick)
+            .sensoryFeedback(.success, trigger: successTick)
+            .sensoryFeedback(.error, trigger: errorTick)
+            .task(id: SearchKey(query: searchQuery, attempt: attempt)) { await search() }
+            .onChange(of: text) { old, new in textChanged(from: old, to: new) }
+            .onChange(of: address) { _, new in addressChanged(to: new) }
+            .onChange(of: isFocused) { _, focused in
+                // Coming back to the field brings back the suggestions it had.
+                isActive = focused && address == nil && status != .idle
+            }
+            .onAppear {
+                // A saved address passed in on first appearance fills an empty field.
+                if let address, query.isEmpty { setText(address.fieldText) }
+            }
+            .onDisappear { resolveTask?.cancel() }
+    }
+
+    /// The bud cycle of the accessory bubble, the list and the row bubble.
+    private func budding(_ content: some View, rows: [Row]) -> some View {
+        content
+            .onChange(of: showsAccessory) { _, shows in cycle("accessory", out: shows) }
+            .onChange(of: rows.map(\.id)) { _, ids in
+                if !ids.isEmpty { keptRows = rows }
+            }
+            .onChange(of: rows.isEmpty) { _, empty in
+                if !empty { keptRows = rows }
+                cycle("list", out: !empty)
+            }
+            .onChange(of: bubbleTarget) { _, target in
+                guard let target else { return cycle("row", out: false) }
+                // Moving between rows while out, it slides along the list's edge.
+                withAnimation(motion.snap) { bubbleRow = target }
+                if !buds.isOut("row") { cycle("row", out: true) }
+            }
+            .onAppear {
+                keptRows = rows
+                bubbleRow = bubbleTarget
+                var placed: [String] = []
+                if showsAccessory { placed.append("accessory") }
+                if !rows.isEmpty { placed.append("list") }
+                if bubbleTarget != nil { placed.append("row") }
+                buds.place(placed)
+            }
+    }
+
+    /// Sends a bubble out of its parent, or calls it home.
+    private func cycle(_ id: String, out: Bool) {
+        Task {
+            if out { await buds.bloom([id], reduceMotion: reduceMotion) } else { await buds.gather([id], reduceMotion: reduceMotion) }
+        }
+    }
+
+    // MARK: Field
+
+    /// The bubbles beside the field and the list are as tall as the field at rest.
+    private var bubble: CGFloat { style.height }
+
+    /// While a bubble holds the column beside them, the field and the list both give it their end, so their edges stay
+    /// in line. The edges pull back on the bubble's own spring, so the two part through a neck.
+    private var column: CGFloat {
+        buds.isOut("accessory") || buds.isOut("row") ? bubble + PieceLiquid.joined : 0
+    }
+
+    /// Searching for suggestions: the accessory bubble spins.
+    private var isSearching: Bool { isLoading && address == nil }
+
+    /// The accessory bubble is out while it spins, or as a clear button while the field is edited and not verified.
+    private var showsAccessory: Bool {
+        isSearching || (address?.isVerified != true && isFocused && !text.isEmpty)
+    }
+
+    /// The offset that tucks a bubble just inside its parent's end: from where the edge already sits when another
+    /// bubble holds the column open, or from the parent's full width when it is about to pull back.
+    private func tucked(columnHeld: Bool) -> CGSize {
+        let width = columnHeld
+            ? -(bubble / 2 + PieceLiquid.joined + bubble * PieceLiquid.homeScale / 2)
+            : bubble * (1 - PieceLiquid.homeScale) / 2
+        return CGSize(width: width, height: 0)
+    }
+
+    private var field: some View {
+        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+        let verified = address?.isVerified == true
+        return HStack(spacing: 12) {
+            if showsRowGlyphs {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.body)
+                    .foregroundStyle(style.pin)
+                    .frame(width: iconWidth)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                // Vertical axis so a long street wraps instead of scrolling out of view; Return arrives as a
+                // line break, which `textChanged` turns into a submit.
+                TextField(label, text: $text, prompt: Text(label).foregroundStyle(style.secondaryLabel), axis: .vertical)
+                    .font(.body)
+                    .lineLimit(1...3)
+                    .foregroundStyle(style.label)
+                    .tint(style.label)
+                    .focused($isFocused)
+                    .textContentType(.fullStreetAddress)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onKeyPress(.downArrow) { moveHighlight(by: 1) }
+                    .onKeyPress(.upArrow) { moveHighlight(by: -1) }
+                    .onKeyPress(.escape) {
+                        guard isActive else { return .ignored }
+                        isActive = false
+                        return .handled
+                    }
+                    .accessibilityLabel(label)
+                    .accessibilityHint(fieldHint)
+                if let address, let line = address.isVerified ? address.localityLine : String(localized: "Used as typed") {
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(style.secondaryLabel)
+                        .lineLimit(2)
+                        .transition(motion.swap)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if verified { check }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, verified ? 12 : 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: style.height, alignment: .leading)
+        // The ring is drawn inside the glass: on iOS 26 a glass container takes in whatever is layered over a glass
+        // shape after it, and the ring would all but vanish. It sits a few points in from the edge, so the bubbles
+        // that bud from the field meet clean glass and their necks never cut through it.
+        .overlay {
+            RoundedRectangle(cornerRadius: max(style.cornerRadius - 3, 0), style: .continuous)
+                .strokeBorder(style.focusRing, lineWidth: 2)
+                .padding(3)
+                .opacity(isFocused ? 1 : 0)
+                .allowsHitTesting(false)
+        }
+        .pieceLiquid(shape, tint: style.field == .clear ? nil : style.field, interactive: false)
+        .contentShape(shape)
+        .onTapGesture { if isEnabled { isFocused = true } }
+        // Taking an address grows the field for the locality line with a little give, though focus leaves in the same update.
+        .animation(motion.morph, value: address)
+        .animation(motion.snap, value: isFocused)
+    }
+
+    /// The verified mark inside the glass: a status, not a control. The field's own resolve lands it with the success
+    /// haptic on the expressive spring; an address set from outside lands on a snap.
+    private var check: some View {
+        let size = min(badgeSize, 36)
+        let arrive = motion.swap.animation(address == resolvedHere ? motion.success : motion.snap)
+        return Image(systemName: "checkmark")
+            .font(.system(size: size * 0.46, weight: .semibold))
+            .foregroundStyle(style.ink)
+            .frame(width: size, height: size)
+            .background(style.success, in: .circle)
+            .transition(.asymmetric(insertion: arrive, removal: motion.swap))
+            .accessibilityHidden(true)
+    }
+
+    /// Beside the field's end: a spinner while suggestions load, otherwise a clear button while the field is edited.
+    private var accessoryBubble: some View {
+        let out = buds.isOut("accessory")
+        let searching = isSearching
+        return Button(action: clear) {
+            ZStack {
+                if searching {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(style.secondaryLabel)
+                        .transition(motion.swap)
+                } else {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(style.label)
+                        .transition(motion.swap)
+                }
+            }
+            .pieceBudContent(out: out)
+            .frame(width: bubble, height: bubble)
+            .contentShape(.circle)
+            .pieceLiquid(.circle, interactive: false)
+        }
+        .buttonStyle(PieceLiquidPressStyle())
+        .animation(motion.snap, value: searching)
+        // A spinner is not a button: it takes no taps and VoiceOver hears the result instead.
+        .allowsHitTesting(!searching)
+        .accessibilityHidden(searching)
+        .accessibilityLabel(String(localized: "Clear address"))
+        .pieceBud(out: out, home: tucked(columnHeld: buds.isOut("row")))
+    }
+
+    private var fieldHint: String {
+        guard let address else { return String(localized: "Type to see address suggestions.") }
+        if address.isVerified { return String(localized: "Verified address: \(address.formatted)") }
+        return String(localized: "Used as typed, not verified.")
+    }
+
+    // MARK: Suggestions
+
+    private enum Row: Identifiable {
+        case suggestion(Suggestion)
+        case typed(String)
+        case empty
+        case failed(String)
+
+        var id: String {
+            switch self {
+            case .suggestion(let s): s.id
+            case .typed: AddressField.typedRowID
+            case .empty: "\u{0}empty"
+            case .failed: AddressField.failedRowID
+            }
+        }
+
+        var isPickable: Bool {
+            switch self {
+            case .suggestion, .typed: true
+            case .empty, .failed: false
+            }
+        }
+    }
+
+    private var rows: [Row] { rows(includingInactive: false) }
+
+    /// `includingInactive` is for Return: the field may already have ended editing when `onSubmit` runs.
+    private func rows(includingInactive: Bool) -> [Row] {
+        // The list stays up while a pick resolves or shows its error, even if Return ended editing.
+        guard address == nil, includingInactive || isActive || resolvingID != nil || failure != nil else { return [] }
+        guard query.count >= Self.minimumQueryLength else { return [] }
+        var rows: [Row]
+        switch status {
+        case .idle: return []
+        case .loaded: rows = suggestions.map(Row.suggestion)
+        case .empty: rows = [.empty]
+        case .failed(let message): rows = [.failed(message)]
+        }
+        let offersTyped = status == .empty || failure != nil || { if case .failed = status { return true } else { return false } }()
+        if allowsUnverified, offersTyped { rows.append(.typed(query)) }
+        return rows
+    }
+
+    /// The row the row bubble belongs beside: the one resolving, or one that failed and can be tried again.
+    private var bubbleTarget: String? {
+        if let resolvingID { return resolvingID }
+        let shown = rows.map(\.id)
+        if let failure, failure.canRetry, shown.contains(failure.id) { return failure.id }
+        if shown.contains(Self.failedRowID) { return Self.failedRowID }
+        return nil
+    }
+
+    /// The thin glass sliver the list is born as and melts back to.
+    private let sliver: CGFloat = 28
+
+    /// The glass list, poured down out of the field: born as a thin sliver tucked inside the field's bottom edge, it
+    /// springs down to rest apart from the field, growing to its full height as it goes, and melts back the same way.
+    /// Its room in the layout opens and closes with it, so what sits below glides rather than jumps.
+    private func list(_ rows: [Row]) -> some View {
+        let out = buds.isOut("list")
+        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+        // How far up the list starts: its sliver a few points inside the field's bottom edge.
+        let home = PieceLiquid.apart + sliver / 2 + sliver * PieceLiquid.homeScale / 2 + 4
+        return ZStack(alignment: .topTrailing) {
+            if buds.contains("row") { rowBubble }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(rows) { row in
+                    Group {
+                        switch row {
+                        case .suggestion(let suggestion): suggestionRow(suggestion)
+                        case .typed(let typed): typedRow(typed)
+                        case .empty: emptyRow
+                        case .failed(let message): failedRow(message)
+                        }
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.listSpace)).midY } action: { rowMids[row.id] = $0 }
+                }
+            }
+            .pieceBudContent(out: out)
+            .padding(6)
+            // Always its full height inside, so the rows never squeeze to fit the sliver and reflow as it grows.
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: out ? nil : sliver, alignment: .top)
+            .clipShape(shape)
+            .pieceLiquid(shape, tint: style.field == .clear ? nil : style.field, interactive: false)
+            .padding(.trailing, column)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(String(localized: "Address suggestions"))
+        }
+        .coordinateSpace(.named(Self.listSpace))
+        .pieceBud(out: out, home: CGSize(width: 0, height: -home))
+        .padding(.top, PieceLiquid.apart)
+        .frame(height: out ? nil : 0, alignment: .top)
+    }
+
+    /// Beside the chosen row, out of the list's end: it spins while the pick resolves, and when a lookup fails and can
+    /// be tried again it turns butter with a retry arrow. Tapping it then tries again.
+    private var rowBubble: some View {
+        let out = buds.isOut("row")
+        let resolving = resolvingID != nil
+        // While the list heads home the bubble rides up with its shrinking edge, so it melts in with the list rather
+        // than hanging below it.
+        let anchor = buds.isOut("list") ? bubbleRow.flatMap { rowMids[$0] } ?? bubble / 2 : sliver / 2
+        return Button(action: retry) {
+            ZStack {
+                if resolving {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(style.label)
+                        .transition(motion.swap)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(style.ink)
+                        .transition(motion.swap)
+                }
+            }
+            .pieceBudContent(out: out)
+            .frame(width: bubble, height: bubble)
+            .contentShape(.circle)
+            // The tint means "try again", and drains as it melts so it dissolves into the list as clear glass.
+            .pieceLiquid(.circle, tint: out && !resolving ? style.error : nil, interactive: false)
+        }
+        .buttonStyle(PieceLiquidPressStyle())
+        .animation(motion.error, value: resolving)
+        .allowsHitTesting(!resolving)
+        // A failed suggestion's row is its own retry button, so only the suggestions request's retry is read out here.
+        .accessibilityHidden(resolving || bubbleRow != Self.failedRowID)
+        .accessibilityLabel(String(localized: "Retry suggestions"))
+        .pieceBud(out: out, home: tucked(columnHeld: buds.isOut("accessory")))
+        .offset(y: anchor - bubble / 2)
+    }
+
+    /// The row bubble's action: a failed suggestion is picked again, a failed suggestions request is sent again.
+    private func retry() {
+        if bubbleRow == Self.failedRowID {
+            attempt += 1
+        } else if let failure, let suggestion = suggestions.first(where: { $0.id == failure.id }) {
+            pick(suggestion)
+        }
+    }
+
+    private var rowRadius: CGFloat { max(style.cornerRadius - 6, 6) }
+    /// At accessibility sizes the row glyphs step aside so titles get the width.
+    private var showsRowGlyphs: Bool { !dynamicTypeSize.isAccessibilitySize }
+
+    /// A row's leading glyph column, so titles line up with the field's text.
+    @ViewBuilder private func rowGlyph(_ name: String) -> some View {
+        if showsRowGlyphs {
+            Image(systemName: name)
+                .font(.body)
+                .foregroundStyle(style.secondaryLabel)
+                .frame(width: iconWidth)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// The warning mark in a row's glyph column: a small butter disc with an ink exclamation mark.
+    private var warningMark: some View {
+        Image(systemName: "exclamationmark")
+            .font(.caption)
+            .foregroundStyle(style.ink)
+            .frame(width: 22, height: 22)
+            .background(style.error, in: .circle)
+            .frame(width: iconWidth)
+            .accessibilityHidden(true)
+    }
+
+    /// A suggestion's leading glyph: the pin, on a solid tile when `Style.tiles` has any, or the warning mark once its
+    /// lookup has failed.
+    @ViewBuilder private func suggestionTile(_ suggestion: Suggestion, failed: Bool) -> some View {
+        if showsRowGlyphs {
+            ZStack {
+                if failed {
+                    warningMark.transition(motion.swap)
+                } else if let tile = style.tile(for: suggestion.title) {
+                    RoundedRectangle(cornerRadius: iconWidth * 0.3, style: .continuous)
+                        .fill(tile)
+                        .frame(width: iconWidth, height: iconWidth)
+                        .overlay {
+                            Image(systemName: "mappin")
+                                .font(.subheadline)
+                                .foregroundStyle(style.ink)
+                        }
+                        .transition(motion.swap)
+                } else {
+                    rowGlyph("mappin").transition(motion.swap)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func suggestionRow(_ suggestion: Suggestion) -> some View {
+        let isResolving = resolvingID == suggestion.id
+        let failed = failure?.id == suggestion.id ? failure : nil
+        let isHighlighted = highlightedID == suggestion.id
+        return Button { pick(suggestion) } label: {
+            HStack(spacing: 12) {
+                suggestionTile(suggestion, failed: failed != nil)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(highlighted(suggestion))
+                        .font(.body)
+                        .foregroundStyle(style.label)
+                        .lineLimit(2)
+                    if let failed {
+                        Text(failed.message)
+                            .font(.subheadline)
+                            .foregroundStyle(style.label)
+                            .transition(motion.swap)
+                    } else if !suggestion.subtitle.isEmpty {
+                        Text(suggestion.subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(style.secondaryLabel)
+                            .lineLimit(2)
+                            .transition(motion.swap)
+                    }
+                }
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: max(rowHeight, 44), alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle(highlight: style.highlight, isHighlighted: isHighlighted || isResolving, radius: rowRadius, reduceMotion: reduceMotion))
+        .opacity(resolvingID != nil && !isResolving ? 0.4 : 1)
+        .accessibilityLabel(suggestion.subtitle.isEmpty ? suggestion.title : "\(suggestion.title), \(suggestion.subtitle)")
+        .accessibilityValue(isResolving ? String(localized: "Finding address") : failed?.message ?? "")
+        .accessibilityHint(failed.map { $0.canRetry ? String(localized: "Tries again.") : "" } ?? String(localized: "Fills in this address."))
+        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
+    }
+
+    private func typedRow(_ typed: String) -> some View {
+        let isHighlighted = highlightedID == Self.typedRowID
+        return Button(action: useTyped) {
+            HStack(spacing: 12) {
+                rowGlyph("character.cursor.ibeam")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Use \u{201C}\(typed)\u{201D}")
+                        .font(.body)
+                        .foregroundStyle(style.label)
+                        .lineLimit(2)
+                    Text("Keep it exactly as typed")
+                        .font(.subheadline)
+                        .foregroundStyle(style.secondaryLabel)
+                }
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: max(rowHeight, 44), alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle(highlight: style.highlight, isHighlighted: isHighlighted, radius: rowRadius, reduceMotion: reduceMotion))
+        .opacity(resolvingID != nil ? 0.4 : 1)
+        .accessibilityLabel(String(localized: "Use as typed: \(typed)"))
+        .accessibilityHint(String(localized: "Sets the address without verifying it."))
+        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
+    }
+
+    private var emptyRow: some View {
+        Text("No matching addresses")
+            .font(.subheadline)
+            .foregroundStyle(style.secondaryLabel)
+            .padding(.leading, showsRowGlyphs ? iconWidth + 12 : 0)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+    }
+
+    /// The suggestions request failed. Its retry is the butter bubble that buds out of the list beside this row.
+    private func failedRow(_ message: String) -> some View {
+        HStack(spacing: 12) {
+            if showsRowGlyphs { warningMark }
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(style.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: max(rowHeight, 44), alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Matched runs in the label colour and the rest of the title in the secondary colour: the source's ranges when it
+    /// gave any, otherwise the query where it appears. One weight throughout, so colour carries the match.
+    private func highlighted(_ suggestion: Suggestion) -> AttributedString {
+        let title = suggestion.title
+        var ranges = suggestion.highlights.filter { $0.lowerBound >= title.startIndex && $0.upperBound <= title.endIndex }
+        if ranges.isEmpty, let match = title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) { ranges = [match] }
+        // Nothing to pick out: the whole title reads in the label colour.
+        guard !ranges.isEmpty else { return AttributedString(title) }
+        var result = AttributedString()
+        var cursor = title.startIndex
+        func quiet(_ text: Substring) -> AttributedString {
+            var run = AttributedString(String(text))
+            run.foregroundColor = style.secondaryLabel
+            return run
+        }
+        for range in ranges.sorted(by: { $0.lowerBound < $1.lowerBound }) where range.lowerBound >= cursor {
+            result += quiet(title[cursor..<range.lowerBound])
+            result += AttributedString(String(title[range]))
+            cursor = range.upperBound
+        }
+        result += quiet(title[cursor...])
+        return result
+    }
+
+    // MARK: Searching
+
+    private func search() async {
+        let query = searchQuery
+        guard query.count >= Self.minimumQueryLength else {
+            isLoading = false
+            resetResults()
+            return
+        }
+        // Text filled in without an edit (a prefilled value on appear) doesn't search until the person edits it.
+        guard isActive else {
+            isLoading = false
+            return
+        }
+        // Debounce: a keystroke inside this window cancels the task before anything is sent.
+        do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+        isLoading = true
+        do {
+            let found: [Suggestion]
+            if let source { found = try await source.suggest(query) } else { found = try await mapKit.suggestions(for: query, region: region) }
+            guard !Task.isCancelled else { return }
+            var seen = Set<String>()
+            let kept = Array(found.filter { seen.insert($0.id).inserted && isAllowed($0) }.prefix(5))
+            isLoading = false
+            suggestions = kept
+            status = kept.isEmpty ? .empty : .loaded
+            if let highlightedID, highlightedID != Self.typedRowID, !kept.contains(where: { $0.id == highlightedID }) { self.highlightedID = nil }
+            if announcedCount != kept.count {
+                announcedCount = kept.count
+                announce(kept.isEmpty ? String(localized: "No matching addresses") : Self.countPhrase(kept.count))
+            }
+        } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            isLoading = false
+            suggestions = []
+            status = .failed(String(localized: "Couldn\u{2019}t load suggestions"))
+            announcedCount = nil
+            announce(String(localized: "Couldn\u{2019}t load suggestions"))
+        }
+    }
+
+    /// "5 suggestions", with the noun inflected for the current language.
+    private static func countPhrase(_ count: Int) -> String {
+        String(AttributedString(localized: "^[\(count) suggestion](inflect: true)").characters)
+    }
+
+    /// Leaves out suggestions whose last line names a country outside `countries`. Anything ambiguous is kept and checked after resolving.
+    private func isAllowed(_ suggestion: Suggestion) -> Bool {
+        guard !countries.isEmpty else { return true }
+        let tail = suggestion.subtitle.split(separator: ",").last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        guard let code = CountryNames.code(for: tail) else { return true }
+        return countries.contains(code)
+    }
+
+    private func resetResults() {
+        suggestions = []
+        status = .idle
+        highlightedID = nil
+        announcedCount = nil
+    }
+
+    // MARK: Picking
+
+    private func pick(_ suggestion: Suggestion) {
+        guard isEnabled else { return }
+        resolveTask?.cancel()
+        failure = nil
+        highlightedID = suggestion.id
+        resolvingID = suggestion.id
+        pickTick += 1
+        announce(String(localized: "Finding address"))
+        resolveTask = Task {
+            do {
+                let resolved: Address
+                if let source { resolved = try await source.resolve(suggestion) } else { resolved = try await mapKit.resolve(suggestion) }
+                guard !Task.isCancelled, resolvingID == suggestion.id else { return }
+                if let message = countryProblem(resolved) {
+                    fail(suggestion, message: message, canRetry: false)
+                } else {
+                    complete(with: resolved)
+                }
+            } catch {
+                guard !Task.isCancelled, !(error is CancellationError), resolvingID == suggestion.id else { return }
+                let message = (error as? LocalizedError)?.errorDescription ?? String(localized: "Couldn\u{2019}t find that address")
+                fail(suggestion, message: message, canRetry: true)
+            }
+        }
+    }
+
+    private func countryProblem(_ address: Address) -> String? {
+        guard !countries.isEmpty else { return nil }
+        if let code = address.isoCountryCode, countries.contains(code) { return nil }
+        if countries.count == 1, let only = countries.first, let name = Locale.current.localizedString(forRegionCode: only) {
+            return String(localized: "Choose an address in \(name)")
+        }
+        return String(localized: "Choose an address in a supported country")
+    }
+
+    private func fail(_ suggestion: Suggestion, message: String, canRetry: Bool) {
+        resolvingID = nil
+        failure = Failure(id: suggestion.id, message: message, canRetry: canRetry)
+        errorTick += 1
+        announce(message)
+    }
+
+    private func complete(with resolved: Address) {
+        resolvingID = nil
+        failure = nil
+        isActive = false
+        setText(resolved.fieldText)
+        address = resolved
+        resolvedHere = resolved
+        resetResults()
+        successTick += 1
+        announce(resolved.isVerified ? String(localized: "Address set: \(resolved.formatted)") : String(localized: "Address set as typed"))
+        isFocused = false
+    }
+
+    private func useTyped() {
+        guard isEnabled, !query.isEmpty else { return }
+        resolveTask?.cancel()
+        // No pick tap here: the address sets at once, and the success haptic in `complete` is this event's one haptic.
+        complete(with: Address(formatted: query, isVerified: false))
+    }
+
+    private func submit() {
+        let pickable = rows(includingInactive: true).filter(\.isPickable)
+        let target = pickable.first(where: { $0.id == highlightedID }) ?? pickable.first
+        switch target {
+        case .suggestion(let suggestion): pick(suggestion)
+        case .typed: useTyped()
+        default: isFocused = false // Nothing to pick: Done just ends editing.
+        }
+    }
+
+    private func moveHighlight(by step: Int) -> KeyPress.Result {
+        let ids = rows.filter(\.isPickable).map(\.id)
+        guard !ids.isEmpty else { return .ignored }
+        let current = highlightedID.flatMap { ids.firstIndex(of: $0) }
+        let next = current.map { min(max($0 + step, 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
+        if ids[next] != highlightedID {
+            highlightedID = ids[next]
+            moveTick += 1
+        }
+        return .handled
+    }
+
+    private func clear() {
+        resolveTask?.cancel()
+        resolvingID = nil
+        failure = nil
+        address = nil
+        setText("")
+        resetResults()
+        isFocused = true
+    }
+
+    // MARK: Edits
+
+    private func setText(_ value: String) {
+        guard text != value else { return }
+        programmatic = value
+        text = value
+    }
+
+    private func textChanged(from old: String, to new: String) {
+        if new == programmatic {
+            programmatic = nil
+            return
+        }
+        if new.contains(where: \.isNewline) {
+            // One line break typed is Return: pick. More text arriving at once is a paste of a multi-line address: join it.
+            if new.count - old.count == 1 {
+                setText(new.filter { !$0.isNewline })
+                submit()
+                return
+            }
+            let joined = new.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: ", ")
+            setText(joined)
+        }
+        // Text and address set together from outside (a saved address) is not an edit.
+        if let address, address.fieldText == new { return }
+        resolveTask?.cancel()
+        resolvingID = nil
+        failure = nil
+        highlightedID = nil
+        if address != nil { address = nil }
+        isActive = isEnabled
+    }
+
+    private func addressChanged(to new: Address?) {
+        guard let new else {
+            resolvedHere = nil
+            return
+        }
+        resolveTask?.cancel()
+        resolvingID = nil
+        failure = nil
+        isActive = false
+        resetResults()
+        setText(new.fieldText)
+    }
+
+    private func announce(_ message: String) {
+        AccessibilityNotification.Announcement(message).post()
+    }
+}
+
+// MARK: - Row style
+
+/// A suggestion row: the highlight wash on press, keyboard highlight or while resolving, and a slight press-in.
+private struct RowButtonStyle: ButtonStyle {
+    let highlight: Color
+    let isHighlighted: Bool
+    let radius: CGFloat
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        return configuration.label
+            .background {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(highlight)
+                    .opacity(configuration.isPressed || isHighlighted ? 1 : 0)
+                    // Like a system row, the wash is there on touch-down and fades as the finger lifts.
+                    .animation(configuration.isPressed ? nil : motion.dismiss, value: configuration.isPressed)
+                    .animation(motion.snap, value: isHighlighted)
+            }
+            // A dense row sinks about a point, so the list stays steady under the finger. Reduce Motion dims it instead.
+            .piecePress(configuration.isPressed, depth: 1)
+    }
+}
+
+// MARK: - MapKit
+
+/// Bridges `MKLocalSearchCompleter` (delegate based) and `MKLocalSearch` (completion based) to cancellable async calls.
+///
+/// Every call gets a token. A newer call, or cancelling the calling task, finishes the older continuation with
+/// `CancellationError`, so a late answer can never be delivered to the wrong query. A retry of the same fragment
+/// (which the completer would ignore) or a region change starts a fresh completer.
+@MainActor
+private final class MapKitAddressSearch: NSObject, MKLocalSearchCompleterDelegate {
+    private enum LookupError: LocalizedError {
+        case notFound
+        var errorDescription: String? { String(localized: "Couldn\u{2019}t find that address") }
+    }
+
+    private var completer: MKLocalSearchCompleter?
+    private var completerRegion: MKCoordinateRegion?
+    private var nextToken = 0
+    private var pendingSuggest: (token: Int, continuation: CheckedContinuation<[AddressField.Suggestion], Error>)?
+    private var pendingResolve: (token: Int, search: MKLocalSearch, continuation: CheckedContinuation<AddressField.Address, Error>)?
+    /// The completions behind the latest suggestions, by suggestion id, for resolving.
+    private var completions: [String: MKLocalSearchCompletion] = [:]
+
+    func suggestions(for query: String, region: MKCoordinateRegion?) async throws -> [AddressField.Suggestion] {
+        nextToken += 1
+        let token = nextToken
+        pendingSuggest?.continuation.resume(throwing: CancellationError())
+        pendingSuggest = nil
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                pendingSuggest = (token, continuation)
+                let completer = completer(for: query, region: region)
+                completer.queryFragment = query
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishSuggest(token: token, with: .failure(CancellationError())) }
+        }
+    }
+
+    func resolve(_ suggestion: AddressField.Suggestion) async throws -> AddressField.Address {
+        guard let completion = completions[suggestion.id] else { throw LookupError.notFound }
+        nextToken += 1
+        let token = nextToken
+        if let pendingResolve {
+            pendingResolve.search.cancel()
+            pendingResolve.continuation.resume(throwing: CancellationError())
+            self.pendingResolve = nil
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let search = MKLocalSearch(request: MKLocalSearch.Request(completion: completion))
+                pendingResolve = (token, search, continuation)
+                search.start { [weak self] response, error in
+                    guard let self else { return }
+                    if let item = response?.mapItems.first {
+                        self.finishResolve(token: token, with: .success(Self.address(from: item)))
+                    } else {
+                        self.finishResolve(token: token, with: .failure(error ?? LookupError.notFound))
+                    }
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishResolve(token: token, with: .failure(CancellationError())) }
+        }
+    }
+
+    private func completer(for query: String, region: MKCoordinateRegion?) -> MKLocalSearchCompleter {
+        if let completer, completer.queryFragment != query, Self.same(completerRegion, region) { return completer }
+        completer?.delegate = nil
+        completer?.cancel()
+        let fresh = MKLocalSearchCompleter()
+        fresh.resultTypes = .address
+        if let region { fresh.region = region }
+        fresh.delegate = self
+        completer = fresh
+        completerRegion = region
+        return fresh
+    }
+
+    private static func same(_ a: MKCoordinateRegion?, _ b: MKCoordinateRegion?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): true
+        case let (a?, b?): a.center.latitude == b.center.latitude && a.center.longitude == b.center.longitude && a.span.latitudeDelta == b.span.latitudeDelta && a.span.longitudeDelta == b.span.longitudeDelta
+        default: false
+        }
+    }
+
+    private func finishSuggest(token: Int, with result: Result<[AddressField.Suggestion], Error>) {
+        guard let pending = pendingSuggest, pending.token == token else { return }
+        pendingSuggest = nil
+        pending.continuation.resume(with: result)
+    }
+
+    private func finishResolve(token: Int, with result: Result<AddressField.Address, Error>) {
+        guard let pending = pendingResolve, pending.token == token else { return }
+        pendingResolve = nil
+        if case .failure = result { pending.search.cancel() }
+        pending.continuation.resume(with: result)
+    }
+
+    // The completer calls its delegate on the main thread.
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        let id = ObjectIdentifier(completer)
+        MainActor.assumeIsolated { self.completerUpdated(id) }
+    }
+
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        let id = ObjectIdentifier(completer)
+        // No matches arrive as an error; treat them as an empty list.
+        let isNoMatch = (error as? MKError)?.code == .placemarkNotFound
+        let failure = error.localizedDescription
+        MainActor.assumeIsolated { self.completerFailed(id, noMatch: isNoMatch, message: failure) }
+    }
+
+    private func completerUpdated(_ id: ObjectIdentifier) {
+        guard let completer, ObjectIdentifier(completer) == id, let token = pendingSuggest?.token else { return }
+        var map: [String: MKLocalSearchCompletion] = [:]
+        let suggestions = completer.results.map { completion in
+            let title = completion.title
+            let highlights = completion.titleHighlightRanges.compactMap { Range($0.rangeValue, in: title) }
+            let suggestion = AddressField.Suggestion(title: title, subtitle: completion.subtitle, highlights: highlights)
+            map[suggestion.id] = completion
+            return suggestion
+        }
+        completions = map
+        finishSuggest(token: token, with: .success(suggestions))
+    }
+
+    private func completerFailed(_ id: ObjectIdentifier, noMatch: Bool, message: String) {
+        guard let completer, ObjectIdentifier(completer) == id, let token = pendingSuggest?.token else { return }
+        if noMatch {
+            completions = [:]
+            finishSuggest(token: token, with: .success([]))
+        } else {
+            finishSuggest(token: token, with: .failure(MKError(.serverFailure, userInfo: [NSLocalizedDescriptionKey: message])))
+        }
+    }
+
+    /// Reads the structured parts. iOS 26 moves map items to `MKAddress`, whose strings carry no separate street or
+    /// postal code, and deprecates `placemark`; see `structuredPlacemark(of:)`.
+    private static func address(from item: MKMapItem) -> AddressField.Address {
+        let coordinate: CLLocationCoordinate2D
+        let placemark: CLPlacemark?
+        var formatted: String?
+        var city: String?
+        var country: String?
+        var isoCountryCode: String?
+        if #available(iOS 26.0, *) {
+            coordinate = item.location.coordinate
+            placemark = structuredPlacemark(of: item)
+            let representations = item.addressRepresentations
+            formatted = representations?.fullAddress(includingRegion: true, singleLine: true) ?? item.address?.fullAddress
+            city = representations?.cityName
+            country = representations?.regionName
+            isoCountryCode = representations?.region?.identifier
+        } else {
+            coordinate = item.placemark.coordinate
+            placemark = item.placemark
+        }
+        let postal = placemark?.postalAddress
+        let street = postal?.street.nonBlank ?? [placemark?.subThoroughfare, placemark?.thoroughfare].compactMap(\.self).joined(separator: " ").nonBlank
+        let parts = AddressField.Address(
+            street: street,
+            city: postal?.city.nonBlank ?? placemark?.locality ?? city,
+            state: postal?.state.nonBlank ?? placemark?.administrativeArea,
+            postalCode: postal?.postalCode.nonBlank ?? placemark?.postalCode,
+            country: postal?.country.nonBlank ?? placemark?.country ?? country,
+            isoCountryCode: postal?.isoCountryCode.nonBlank ?? placemark?.isoCountryCode ?? isoCountryCode,
+            coordinate: coordinate
+        )
+        // Parts win when the lookup returned them, so the line follows the country's postal format; the system string covers the rest.
+        guard parts.street == nil || parts.postalCode == nil, let formatted else { return parts }
+        return AddressField.Address(street: parts.street, city: parts.city, state: parts.state, postalCode: parts.postalCode, country: parts.country, isoCountryCode: parts.isoCountryCode, coordinate: coordinate, formatted: formatted)
+    }
+
+    /// On iOS 26 the map item still carries its placemark at runtime, but only through a deprecated property, and
+    /// `MKAddress` has no separate street or postal code. The placemark is read dynamically so the file builds
+    /// without deprecation warnings; if a future release drops it, the address falls back to the iOS 26 strings
+    /// (full line, city, country and country code) with street and postal code left `nil`.
+    @available(iOS 26.0, *)
+    private static func structuredPlacemark(of item: MKMapItem) -> CLPlacemark? {
+        let key = "placemark"
+        guard item.responds(to: NSSelectorFromString(key)) else { return nil }
+        return item.value(forKey: key) as? CLPlacemark
+    }
+}
+
+// MARK: - Helpers
+
+/// Localized country names to ISO codes, for filtering suggestions by their last line.
+private enum CountryNames {
+    static let byName: [String: String] = {
+        var map: [String: String] = [:]
+        let locales = [Locale.current, Locale(identifier: "en_US")]
+        for region in Locale.Region.isoRegions where region.identifier.count == 2 {
+            for locale in locales {
+                if let name = locale.localizedString(forRegionCode: region.identifier) { map[fold(name)] = region.identifier }
+            }
+        }
+        return map
+    }()
+
+    static func code(for name: String) -> String? { byName[fold(name)] }
+
+    private static func fold(_ text: String) -> String { text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+}
+
+private extension Optional where Wrapped == String {
+    var nonBlank: String? { self?.nonBlank }
+}
+
+private extension String {
+    var nonBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// System strings sometimes carry double spaces ("CA  95014").
+    var collapsingSpaces: String {
+        split(whereSeparator: { $0 == " " || $0 == "\u{00A0}" }).joined(separator: " ")
+    }
+}
+
+/// A house-palette color that follows the interface style.
+private func adaptive(light: UInt32, dark: UInt32) -> Color {
+    Color(uiColor: UIColor { @Sendable traits in
+        let hex = traits.userInterfaceStyle == .dark ? dark : light
+        return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+    })
+}
+
+// MARK: - Example
+
+/// A delivery address that accepts the United States and Canada, and a saved address passed in.
+private struct AddressFieldExample: View {
+    @State private var query = ""
+    @State private var address: AddressField.Address?
+    @State private var savedQuery = ""
+    @State private var saved: AddressField.Address? = AddressField.Address(
+        street: "48 Juniper Lane", city: "Bellmont", state: "OR", postalCode: "97321", country: "United States", isoCountryCode: "US",
+        coordinate: CLLocationCoordinate2D(latitude: 44.6, longitude: -123.1)
+    )
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                AddressField("Delivery address", text: $query, address: $address, countries: ["US", "CA"])
+                AddressField("Billing address", text: $savedQuery, address: $saved)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(adaptive(light: 0xF3F2EE, dark: 0x121212))
+    }
+}
+
+#Preview("Light") {
+    AddressFieldExample()
+}
+
+#Preview("Dark") {
+    AddressFieldExample()
+        .preferredColorScheme(.dark)
+}
+
+// MARK: - Piece motion
+//
+// The SwiftPieces motion language: shared spring tokens and gesture physics, with the same values in every
+// piece. Each piece carries a copy of only the parts it uses, so this file stands alone. Generated from
+// registry/foundation/PieceMotion.swift in the SwiftPieces repo; edit it there, not here.
+// swiftpieces-motion: 1.1.0 (core, pressMath, press)
+
+/// The SwiftPieces motion language: five spring tiers, and a named role for every moment a piece moves,
+/// each with its Reduce Motion substitute.
+///
+/// Build one from the environment, `PieceMotion(reduceMotion: reduceMotion)`, and pick the role that names
+/// what just happened. Never animate the tracking of a finger: set gesture state directly in `onChanged`, so the
+/// surface stays under the finger, and spring only the release.
+private struct PieceMotion {
+    var reduceMotion = false
+
+    // Tiers. Overshoot and settle times are measured from rest with SwiftUI's Spring.
+    /// No overshoot, 90% in about 90ms. A press arriving under the finger.
+    static var tight: Spring { Spring(duration: 0.14, bounce: 0) }
+    /// About 2.8% overshoot, 90% in about 140ms. Snapping to a detent, page or segment.
+    static var responsive: Spring { Spring(duration: 0.32, bounce: 0.25) }
+    /// About 8.4% overshoot. Visible give: a release, a return from past an edge, a drag settling home.
+    static var elastic: Spring { Spring(duration: 0.42, bounce: 0.38) }
+    /// About 15% overshoot. A resolved action landing. At most once per interaction.
+    static var expressive: Spring { Spring(duration: 0.48, bounce: 0.48) }
+    /// About 1.5% overshoot, unhurried. Opening large surfaces and ambient change.
+    static var calm: Spring { Spring(duration: 0.5, bounce: 0.2) }
+
+    /// Reduce Motion: settles become this short spring with no overshoot.
+    private static var still: Animation { .spring(duration: 0.25, bounce: 0) }
+
+    // Roles.
+    /// Touch-down. Starts on the same frame and never bounces under the finger.
+    var press: Animation { .spring(Self.tight) }
+    /// The finger lifts off a pressed surface, which springs back through rest.
+    var release: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A dragged thing comes to rest. With a gesture's velocity, use `settle(velocity:from:to:)` instead.
+    var settle: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// Lands on a detent, page or segment.
+    var snap: Animation { reduceMotion ? Self.still : .spring(Self.responsive) }
+    /// A number, a chart value or anything else people read moves to its new value. Never overshoots, so it
+    /// never shows a value that isn't true.
+    var value: Animation { reduceMotion ? Self.still : .spring(duration: 0.35, bounce: 0) }
+    /// Comes back from past a limit: a pull beyond the edge, a value pushed against its bound.
+    var rebound: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A shape or container changes size, corner radius or form, with a little give at the end.
+    var morph: Animation { reduceMotion ? Self.still : .spring(duration: 0.4, bounce: 0.2) }
+    /// Something appears, opens or expands. Opening is a little slower than closing.
+    var reveal: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.calm) }
+    /// Something leaves, closes or collapses. Quick and firm, out of the way.
+    var dismiss: Animation { reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.3, bounce: 0.08) }
+    /// A resolved action lands: a check, a sent state, a reaction.
+    var success: Animation { reduceMotion ? .easeOut(duration: 0.24) : .spring(Self.expressive) }
+    /// A refused action. Firm, no wobble; `pieceShake` adds the movement.
+    var error: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.responsive) }
+    /// Slow ambient change. Loops themselves stop under Reduce Motion: check `allowsAmbient`.
+    var ambient: Animation { reduceMotion ? .easeInOut(duration: 0.3) : .spring(Self.calm) }
+
+    /// Loops, drifts, idle breathing and parallax run only when this is true.
+    var allowsAmbient: Bool { !reduceMotion }
+
+    /// A moving transition, or a plain fade under Reduce Motion.
+    func transition(_ transition: AnyTransition) -> AnyTransition {
+        reduceMotion ? .opacity : transition
+    }
+
+    /// For content replaced inside a container that stays put (a label, a glyph, a count): the old content
+    /// blurs out as the new one sharpens in. A fade under Reduce Motion.
+    @MainActor var swap: AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+}
+
+extension PieceMotion {
+    /// About `depth` points per edge, not a fixed percentage: an icon sinks to 0.92, a pill 0.95, a card 0.985.
+    nonisolated static func pressScale(for size: CGSize, depth: CGFloat = 2.5) -> CGFloat {
+        let side = (max(size.width, 1) * max(size.height, 1)).squareRoot()
+        return min(max(1 - depth * 2 / side, 0.92), 0.985)
+    }
+
+    /// An anchor partway from the center toward the touch, so the press leans into the finger without tipping.
+    nonisolated static func pressAnchor(touch: CGPoint?, in size: CGSize, lean: CGFloat = 0.6) -> UnitPoint {
+        guard let touch, size.width > 0, size.height > 0 else { return .center }
+        let x = min(max(touch.x / size.width, 0), 1)
+        let y = min(max(touch.y / size.height, 0), 1)
+        return UnitPoint(x: 0.5 + (x - 0.5) * lean, y: 0.5 + (y - 0.5) * lean)
+    }
+}
+
+/// Sinks on touch-down, leaning toward the touch if given, and springs back from the same lean. Under Reduce
+/// Motion it shades instead of moving (darker in light mode, lighter in dark), without turning transparent.
+private struct PiecePress: ViewModifier {
+    let pressed: Bool
+    var touch: CGPoint?
+    var depth: CGFloat = 2.5
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var size: CGSize = .zero
+    @State private var anchor: UnitPoint = .center
+
+    func body(content: Content) -> some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        let scale = pressed && !reduceMotion ? PieceMotion.pressScale(for: size, depth: depth) : 1
+        content
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+            .brightness(pressed && reduceMotion ? (colorScheme == .dark ? 0.1 : -0.08) : 0)
+            .scaleEffect(scale, anchor: anchor)
+            .animation(pressed ? motion.press : motion.release, value: pressed)
+            .onChange(of: pressed) { _, isPressed in
+                if isPressed { anchor = PieceMotion.pressAnchor(touch: touch, in: size) }
+            }
+            .onChange(of: touch) { _, touch in
+                if pressed, let touch { anchor = PieceMotion.pressAnchor(touch: touch, in: size) }
+            }
+    }
+}
+
+private extension View {
+    /// Sinks this view while `pressed`, leaning toward `touch` (in this view's coordinates) when given.
+    func piecePress(_ pressed: Bool, touch: CGPoint? = nil, depth: CGFloat = 2.5) -> some View {
+        modifier(PiecePress(pressed: pressed, touch: touch, depth: depth))
+    }
+}
+
+// swiftpieces-motion: end
+
+// MARK: - Piece liquid
+//
+// The SwiftPieces liquid glass language: glass shapes that merge through a neck, bubbles that bud out of
+// and melt back into each other, and the frosted fallback before iOS 26. Each piece carries a copy of only
+// the parts it uses, so this file stands alone. Generated from registry/foundation/PieceLiquid.swift in the
+// SwiftPieces repo; edit it there, not here. The rules are in LIQUID_GLASS.md.
+// swiftpieces-liquid: 1.8.0 (liquid, liquidPress, bud)
+
+/// The liquid glass language: one merge distance, two rest gaps, and the springs a bubble leaves and comes home on.
+///
+/// Glass shapes inside one `PieceLiquidGroup` melt into each other through a neck when they come within `merge`
+/// points. Parts of one control rest `joined`, inside that distance, so the neck holds; separate actions rest
+/// `apart`, outside it, so they only goo while one buds out of, or melts back into, another.
+private enum PieceLiquid {
+    /// Glass shapes closer than this share a neck.
+    static let merge: CGFloat = 20
+    /// The gap between parts of one control (a stepper's buttons, a progress pill and its stop): the neck holds,
+    /// short and smooth, about two thirds of the shapes' height at its waist. Joined parts read best at one height.
+    static let joined: CGFloat = 4
+    /// The gap between separate actions (menu items, confirm and cancel, chips): they rest as their own bubbles.
+    static let apart: CGFloat = 26
+    /// How far a bubble shrinks while it is home inside its parent.
+    static let homeScale: CGFloat = 0.72
+
+    /// A bubble leaving its parent: slow enough that the neck's stretch and snap read.
+    static func split(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.62, bounce: 0.22)
+    }
+
+    /// A bubble going home. No bounce: a bounce would carry it out through the far side of its parent.
+    static func home(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.5, bounce: 0)
+    }
+}
+
+/// A group of glass shapes that merge into one liquid surface. On iOS 26 it is a `GlassEffectContainer`; before
+/// that, and under Reduce Transparency, the shapes draw on their own and simply don't merge. `lift` adds the soft
+/// shadow liquid glass floats on in light mode.
+private struct PieceLiquidGroup<Content: View>: View {
+    var spacing: CGFloat = PieceLiquid.merge
+    var lift = true
+    @ViewBuilder var content: Content
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        container
+            .shadow(color: .black.opacity(lift && colorScheme == .light ? 0.07 : 0), radius: 18, y: 8)
+    }
+
+    @ViewBuilder private var container: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+/// One liquid glass shape: Liquid Glass on iOS 26, carrying `tint` as a solid colour and swelling under a press when
+/// `interactive`; a frosted Material with a light rim and a soft shadow before that; a solid fill under Reduce
+/// Transparency.
+///
+/// The tint is painted inside clear glass rather than tinting the glass. Tinted glass in a group bleeds its colour
+/// through every neck as a smear, so a red button would glow into the white pill it is joined to; painted inside,
+/// the colour stays crisp to the shape's edge, the necks between shapes are clear glass, and a tint change animates
+/// like any colour (tinted glass snaps).
+private struct PieceLiquidSurface<S: Shape>: ViewModifier {
+    var shape: S
+    var tint: Color?
+    var interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.pieceLiquidScale) private var scale
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            // Scaled as two parts, content and outline, about the same centre. A scaleEffect on a glass view inside a
+            // GlassEffectContainer shrinks the glass but leaves what it carries full size, pinned to its corner.
+            content
+                .background { shape.fill(tint ?? .clear) }
+                .scaleEffect(scale)
+                .glassEffect(glass, in: shape.scale(scale))
+        } else {
+            fallback(content).scaleEffect(scale)
+        }
+        #else
+        fallback(content).scaleEffect(scale)
+        #endif
+    }
+
+    #if compiler(>=6.2)
+    @available(iOS 26, *)
+    private var glass: Glass {
+        interactive ? Glass.regular.interactive() : .regular
+    }
+    #endif
+
+    private func fallback(_ content: Content) -> some View {
+        let dark = colorScheme == .dark
+        return content
+            .background {
+                if reduceTransparency {
+                    shape.fill(tint ?? (dark ? Color(white: 0.17) : Color(white: 0.97)))
+                } else {
+                    ZStack {
+                        shape.fill(.regularMaterial)
+                        if let tint { shape.fill(tint.opacity(0.88)) }
+                    }
+                }
+            }
+            .overlay { shape.stroke(Color.white.opacity(dark ? 0.14 : 0.7), lineWidth: 0.5) }
+            .shadow(color: .black.opacity(dark ? 0.32 : 0.08), radius: 10, y: 5)
+    }
+}
+
+private struct PieceLiquidScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1
+}
+
+private extension EnvironmentValues {
+    /// How much the liquid shapes below are scaled, about their own centres. Nested scales multiply.
+    var pieceLiquidScale: CGFloat {
+        get { self[PieceLiquidScaleKey.self] }
+        set { self[PieceLiquidScaleKey.self] = newValue }
+    }
+}
+
+private extension View {
+    /// Draws this view on a liquid glass `shape`. Put it inside a `PieceLiquidGroup` so it can merge with its neighbours.
+    func pieceLiquid<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(PieceLiquidSurface(shape: shape, tint: tint, interactive: interactive))
+    }
+
+    /// Scales the liquid glass shapes in this view, content and outline together, about their own centres. Use it
+    /// instead of `scaleEffect` on a glass view (a press, a lift, a swell): inside a group a plain `scaleEffect` shrinks
+    /// the glass but leaves its content full size and off centre. Animates like any other value.
+    func pieceLiquidScale(_ scale: CGFloat) -> some View {
+        transformEnvironment(\.pieceLiquidScale) { $0 *= scale }
+    }
+}
+
+/// The press for a glass control: the same size-aware sink and lean as `piecePress`, applied through
+/// `pieceLiquidScale` so the glass and what it carries sink together (a plain scaleEffect on glass leaves the content
+/// behind). Put the glass inside what it presses: the label of a button, the view this modifies. Under Reduce Motion
+/// it shades instead of moving.
+private struct PieceLiquidPress: ViewModifier {
+    let pressed: Bool
+    var touch: CGPoint?
+    var depth: CGFloat = 2.5
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var size: CGSize = .zero
+    @State private var anchor: UnitPoint = .center
+
+    func body(content: Content) -> some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        let scale = pressed && !reduceMotion ? PieceMotion.pressScale(for: size, depth: depth) : 1
+        // A scale about `anchor` is a scale about the centre plus this shift toward the anchor.
+        let lean = CGSize(width: (anchor.x - 0.5) * size.width * (1 - scale), height: (anchor.y - 0.5) * size.height * (1 - scale))
+        content
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+            .brightness(pressed && reduceMotion ? (colorScheme == .dark ? 0.1 : -0.08) : 0)
+            .pieceLiquidScale(scale)
+            .offset(lean)
+            .animation(pressed ? motion.press : motion.release, value: pressed)
+            .onChange(of: pressed) { _, isPressed in
+                if isPressed { anchor = PieceMotion.pressAnchor(touch: touch, in: size) }
+            }
+            .onChange(of: touch) { _, touch in
+                if pressed, let touch { anchor = PieceMotion.pressAnchor(touch: touch, in: size) }
+            }
+    }
+}
+
+/// `PiecePressStyle` for glass buttons: the label (with its `.pieceLiquid` inside) sinks as one.
+private struct PieceLiquidPressStyle: ButtonStyle {
+    var depth: CGFloat = 2.5
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.pieceLiquidPress(configuration.isPressed, depth: depth)
+    }
+}
+
+private extension View {
+    /// Sinks this view's glass while `pressed`, leaning toward `touch` (in this view's coordinates) when given.
+    func pieceLiquidPress(_ pressed: Bool, touch: CGPoint? = nil, depth: CGFloat = 2.5) -> some View {
+        modifier(PieceLiquidPress(pressed: pressed, touch: touch, depth: depth))
+    }
+}
+
+/// The bud: how a bubble leaves and rejoins its parent, driven explicitly so every bubble shows the whole cycle.
+///
+/// A bubble is born at `home`, inside its parent, where the two glass shapes are one. It springs out to `rest`, and
+/// while it is inside the merge distance a neck holds it to the parent, thinning as it goes, until it snaps free.
+/// Going home it springs back on a spring with no bounce, the neck reaches out and re-forms, and only once it has
+/// melted all the way in is it removed. Both offsets are relative to where the bubble is laid out. Under Reduce
+/// Motion it stays at `rest`: its content fades and its glass closes in place.
+private struct PieceBud: ViewModifier {
+    var out: Bool
+    var rest: CGSize
+    var home: CGSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            // No travel. Inside a group glass ignores opacity, so the glass closes to nothing in place on the short
+            // Reduce Motion ease while its content fades; the opacity covers a bubble outside a group.
+            content
+                .pieceLiquidScale(out ? 1 : 0.001)
+                .opacity(out ? 1 : 0)
+                .offset(rest)
+        } else {
+            // The glass shrinks through `pieceLiquidScale`, never a plain scaleEffect (see there), then moves.
+            content
+                .pieceLiquidScale(out ? 1 : PieceLiquid.homeScale)
+                .offset(out ? rest : home)
+        }
+    }
+}
+
+/// A bubble's own content, on its own clock: gone the moment the bubble heads home, so it never rides over the
+/// parent's content, and arriving just after the bubble leaves.
+private struct PieceBudContent: ViewModifier {
+    var out: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .blur(radius: out ? 0 : 6)
+            .opacity(out ? 1 : 0)
+            .animation(out ? .easeOut(duration: 0.3).delay(0.1) : .easeOut(duration: 0.14), value: out)
+    }
+}
+
+private extension View {
+    /// Places a bubble at `rest` while `out`, and at `home` (inside its parent, shrunk) while not.
+    func pieceBud(out: Bool, rest: CGSize = .zero, home: CGSize) -> some View {
+        modifier(PieceBud(out: out, rest: rest, home: home))
+    }
+
+    /// Hides a bubble's icon or label while it is home. Put it on the content, inside the glass.
+    func pieceBudContent(out: Bool) -> some View {
+        modifier(PieceBudContent(out: out))
+    }
+}
+
+/// Which bubbles exist and which are out. A bubble is added home with no animation, sent out on the next frame,
+/// and called home before it is removed, so it always melts in rather than fading. Keep one in `@State`.
+@MainActor @Observable
+private final class PieceBuds {
+    private(set) var present: [String] = []
+    private(set) var out: Set<String> = []
+    /// The latest call for each bubble. A bloom or gather that has been overtaken (a bubble sent home while it was
+    /// still waiting to go out, or called out again while melting) leaves that bubble alone.
+    @ObservationIgnored private var turn: [String: Int] = [:]
+
+    func contains(_ id: String) -> Bool { present.contains(id) }
+    func isOut(_ id: String) -> Bool { out.contains(id) }
+
+    private func claim(_ ids: [String]) -> [String: Int] {
+        var mine: [String: Int] = [:]
+        for id in ids {
+            let next = (turn[id] ?? 0) + 1
+            turn[id] = next
+            mine[id] = next
+        }
+        return mine
+    }
+
+    /// Puts bubbles straight out at rest with no motion: a view's first frame, or a state restored.
+    func place(_ ids: [String]) {
+        _ = claim(ids)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            for id in ids where !present.contains(id) { present.append(id) }
+            out.formUnion(ids)
+        }
+    }
+
+    /// Adds bubbles home, then sends each out, `stagger` seconds apart, after an optional `delay`.
+    func bloom(_ ids: [String], reduceMotion: Bool, stagger: Double = 0.05, delay: Double = 0) async {
+        let mine = claim(ids)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            for id in ids where !present.contains(id) { present.append(id) }
+        }
+        try? await Task.sleep(for: .milliseconds(24 + Int(max(delay, 0) * 1000)))
+        let split = PieceLiquid.split(reduceMotion: reduceMotion)
+        for (i, id) in ids.enumerated() where turn[id] == mine[id] {
+            withAnimation(split.delay(reduceMotion ? 0 : Double(i) * stagger)) { _ = out.insert(id) }
+        }
+    }
+
+    /// Calls bubbles home, last first, then removes them once they have melted in.
+    func gather(_ ids: [String], reduceMotion: Bool, stagger: Double = 0.04) async {
+        let mine = claim(ids)
+        let home = PieceLiquid.home(reduceMotion: reduceMotion)
+        for (i, id) in ids.reversed().enumerated() {
+            withAnimation(home.delay(reduceMotion ? 0 : Double(i) * stagger)) { _ = out.remove(id) }
+        }
+        try? await Task.sleep(for: .milliseconds(Int((0.52 + Double(ids.count) * stagger) * 1000)))
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) { present.removeAll { ids.contains($0) && !out.contains($0) && turn[$0] == mine[$0] } }
+    }
+}
+
+// swiftpieces-liquid: end

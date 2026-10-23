@@ -1,0 +1,26 @@
+ListNodeLlmRoute 参数
+
+任务区域（左侧）:
+- taskIcon: Image
+- taskIconColor: Color
+- taskText: String
+- taskFont: Font?
+- taskFontSize: CGFloat
+- taskFontColor: Color
+
+LLM 区域（右侧，文字右对齐，图标位于最右侧）:
+- llmIcon: Image
+- llmIconColor: Color
+- llmName: String
+- llmNameFont: Font?
+- llmNameFontSize: CGFloat
+- llmNameColor: Color
+- llmModelName: String
+- llmModelFont: Font?
+- llmModelFontSize: CGFloat
+- llmModelColor: Color
+
+交互:
+- onTap: (() -> Void)?，可选；传入时整行可点击，不传入时仅展示。
+
+所有字体大小都有合理默认值。字体大小不是有限正数时会回退到默认值。组件仅负责呈现，不负责保存或执行路由。

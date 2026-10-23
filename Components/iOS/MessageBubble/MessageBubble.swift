@@ -73,6 +73,58 @@ public enum MessageBubbleBorder {
 /// A reusable, content-agnostic chat bubble with an optional timestamp outside the silhouette.
 /// The host app remains responsible for message data, sender grouping, and timestamp formatting.
 public struct MessageBubble<Content: View>: View {
+    /// Complete configuration for a message bubble, including its timestamp presentation.
+    public struct Configuration {
+        public var cornerRadius: CGFloat
+        public var sharpCorner: MessageBubbleShape.SharpCorner
+        public var style: MessageBubbleStyle
+        public var fill: AnyShapeStyle
+        public var border: MessageBubbleBorder
+        public var padding: EdgeInsets
+        public var width: CGFloat?
+        public var height: CGFloat?
+        public var alignment: Alignment
+        public var timestamp: String?
+        public var metadataAlignment: HorizontalAlignment
+        public var timestampColor: Color
+        public var timestampFont: Font
+        public var font: Font
+        public var lineSpacing: CGFloat
+
+        public init(
+            cornerRadius: CGFloat = 16,
+            sharpCorner: MessageBubbleShape.SharpCorner = .bottomTrailing,
+            style: MessageBubbleStyle = .tailLess,
+            fill: AnyShapeStyle = AnyShapeStyle(Color.accentColor),
+            border: MessageBubbleBorder = .none,
+            padding: EdgeInsets = EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14),
+            width: CGFloat? = nil,
+            height: CGFloat? = nil,
+            alignment: Alignment = .leading,
+            timestamp: String? = nil,
+            metadataAlignment: HorizontalAlignment = .trailing,
+            timestampColor: Color = .secondary,
+            timestampFont: Font = .caption2,
+            font: Font = .body,
+            lineSpacing: CGFloat = 0
+        ) {
+            self.cornerRadius = cornerRadius
+            self.sharpCorner = sharpCorner
+            self.style = style
+            self.fill = fill
+            self.border = border
+            self.padding = padding
+            self.width = width
+            self.height = height
+            self.alignment = alignment
+            self.timestamp = timestamp
+            self.metadataAlignment = metadataAlignment
+            self.timestampColor = timestampColor
+            self.timestampFont = timestampFont
+            self.font = font
+            self.lineSpacing = lineSpacing
+        }
+    }
     private let cornerRadius: CGFloat
     private let sharpCorner: MessageBubbleShape.SharpCorner
     private let style: MessageBubbleStyle
@@ -165,6 +217,52 @@ public struct MessageBubble<Content: View>: View {
         self.content = content()
     }
 
+    public init<S: ShapeStyle>(
+        configuration: Configuration,
+        fill: S,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            cornerRadius: configuration.cornerRadius,
+            sharpCorner: configuration.sharpCorner,
+            style: configuration.style,
+            fill: fill,
+            border: configuration.border,
+            padding: configuration.padding,
+            width: configuration.width,
+            height: configuration.height,
+            alignment: configuration.alignment,
+            timestamp: configuration.timestamp,
+            metadataAlignment: configuration.metadataAlignment,
+            timestampColor: configuration.timestampColor,
+            timestampFont: configuration.timestampFont,
+            font: configuration.font,
+            lineSpacing: configuration.lineSpacing,
+            content: content
+        )
+    }
+
+    public init(configuration: Configuration, @ViewBuilder content: () -> Content) {
+        self.init(
+            cornerRadius: configuration.cornerRadius,
+            sharpCorner: configuration.sharpCorner,
+            style: configuration.style,
+            fill: configuration.fill,
+            border: configuration.border,
+            padding: configuration.padding,
+            width: configuration.width,
+            height: configuration.height,
+            alignment: configuration.alignment,
+            timestamp: configuration.timestamp,
+            metadataAlignment: configuration.metadataAlignment,
+            timestampColor: configuration.timestampColor,
+            timestampFont: configuration.timestampFont,
+            font: configuration.font,
+            lineSpacing: configuration.lineSpacing,
+            content: content
+        )
+    }
+
     private var bubbleShape: MessageBubbleShape {
         MessageBubbleShape(cornerRadius: cornerRadius, sharpCorner: sharpCorner, style: style)
     }
@@ -181,7 +279,6 @@ public struct MessageBubble<Content: View>: View {
                 }
                 .overlay {
                     GeometryReader { geometry in
-                        let rect = CGRect(origin: .zero, size: geometry.size)
                         switch border {
                         case .none:
                             EmptyView()
@@ -189,8 +286,22 @@ public struct MessageBubble<Content: View>: View {
                             bubbleShape
                                 .stroke(color, lineWidth: lineWidth.isFinite ? max(0, lineWidth) : 0)
                         case .dashed(let configuration, let dashFill, let coordinates, let phase):
-                            LineDashed(
-                                path: bubbleShape.path(in: rect),
+                            // Canvas clips to its own rectangular bounds. Give it an 8pt
+                            // bleed area (the tail is 6pt wide), then translate the original
+                            // zero-origin shape into that area. RoundedRectSmoothed's tail
+                            // geometry assumes a zero-origin rect; passing an inset rect
+                            // directly mixes minX/minY with width/height and distorts the path.
+                            let bleed: CGFloat = 8
+                            let bubbleSize = CGSize(
+                                width: max(0, geometry.size.width - bleed * 2),
+                                height: max(0, geometry.size.height - bleed * 2)
+                            )
+                            let basePath = bubbleShape.path(in: CGRect(origin: .zero, size: bubbleSize))
+                            let expandedPath = basePath.applying(
+                                CGAffineTransform(translationX: bleed, y: bleed)
+                            )
+                            DashedPath(
+                                path: expandedPath,
                                 configuration: configuration,
                                 fill: dashFill,
                                 fillCoordinates: coordinates,
@@ -198,6 +309,7 @@ public struct MessageBubble<Content: View>: View {
                             )
                         }
                     }
+                    .padding(-8)
                     .allowsHitTesting(false)
                 }
                 .contentShape(bubbleShape)

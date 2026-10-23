@@ -1,0 +1,9 @@
+app会有很多设置界面, 每个设置界面内部, 容器千变万化, 但是可以有一些共用的设计选择, 使得用户看界面就知道这里是咱这个app的设置界面;
+
+title text; font; fontsize; color; align; 
+textgroup1 font; fontsize; color; 
+textgroup2 font; fontsize; color;
+icongroup1 fontsize; color;
+icongroup2 fontsize; color;
+pathgroup1 (any view) //这个是为了给后续分割线做准备的, 分割线可能是我们自定义的DashedPath, 也可能是别的新的自定义view
+pathgroup2 (any view)

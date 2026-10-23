@@ -7,7 +7,8 @@ A standalone, native SwiftUI message composer inspired by the interaction model 
 - Owns presentation and local view interaction only.
 - Reads and edits the draft through `Binding<String>`.
 - Receives generation state from the caller and reports send/stop actions through closures.
-- Shows attachment and tools controls only when their callbacks are supplied.
+- Shows the optional attachment control only when its callback is supplied.
+- Uses a single-line horizontal text field inside one capsule surface.
 - Uses adaptive SwiftUI system colors and material, so it follows light/dark appearance without a second design-token system.
 
 It deliberately does **not** clear the draft, manage requests, store conversation history, or decide what attachment/tools actions do. The parent owns those behaviors.
@@ -26,8 +27,7 @@ struct ChatScreen: View {
             isGenerating: isGenerating,
             onSend: sendDraft,
             onStop: stopGeneration,
-            onAttach: chooseAttachment,
-            onTools: showTools
+            onAttach: chooseAttachment
         )
         .padding()
     }
@@ -46,7 +46,6 @@ struct ChatScreen: View {
     }
 
     private func chooseAttachment() { /* Present the app's attachment picker. */ }
-    private func showTools() { /* Present the app's tools menu. */ }
 }
 ```
 
@@ -65,11 +64,9 @@ import CrossProjectComponentsIOS
 | `text` | Caller-owned draft, editable through a binding |
 | `placeholder` | Placeholder text; defaults to `Message` |
 | `isGenerating` | Caller-owned generation state; swaps send for stop |
-| `maxLines` | Visible text-line limit; defaults to 6 and is clamped to at least 1 |
 | `onSend` | Invoked only for a non-whitespace draft when not generating |
 | `onStop` | Optional cancellation callback; stop is disabled if absent |
 | `onAttach` | Optional attachment action; control is omitted if absent |
-| `onTools` | Optional tools-menu action; control is omitted if absent |
 
 The component is intentionally kept in one source file: its layout and event flow are small enough that splitting them into internal types would add navigation without establishing a reusable abstraction.
 

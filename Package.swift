@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CrossProjectComponents",
-    platforms: [.iOS(.v17), .macOS(.v13)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "CrossProjectComponents", targets: ["CrossProjectComponents"]),
         .library(name: "CrossProjectComponentsIOS", targets: ["CrossProjectComponentsIOS"]),
@@ -14,8 +14,10 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0"),
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", .upToNextMinor(from: "2.4.1")),
+        .package(path: "Components/iOS/Trivial/SheetConfig"),
         .package(path: "Shapes/LineDashed"),
-        .package(path: "Textures/LiquidGlass")
+        .package(path: "Textures/LiquidGlass"),
+        .package(path: "Components/iOS/Animated")
     ],
     targets: [
         .target(
@@ -26,9 +28,9 @@ let package = Package(
         ),
         .target(
             name: "CrossProjectComponentsIOS",
-            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), "StickerData", "ImgData", "BackgroundData"],
+            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), .product(name: "Animated", package: "Animated"), .product(name: "BottomSheet", package: "SheetConfig"), "StickerData", "ImgData", "BackgroundData"],
             path: "Components/iOS",
-            exclude: ["Animated", "MessageComposer/README.md", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift"],
+            exclude: ["Animated", "ContactCard/Package.swift", "ContactCard/README.md", "ContactCard/build.sh", "ContactCard/Tests", "ContactCard/Examples", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift", "Trivial/SheetConfig/Package.swift"],
             resources: [.process("Resources")]
         ),
         .target(name: "StickerData", path: "Class/Sticker", exclude: ["README.md"]),

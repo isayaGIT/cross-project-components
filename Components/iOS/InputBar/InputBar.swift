@@ -12,12 +12,10 @@ public struct InputBar: View {
 
     private let placeholder: String
     private let isGenerating: Bool
-    private let maxLines: Int
     private let accessoryPanel: AnyView?
     private let onSend: () -> Void
     private let onStop: (() -> Void)?
     private let onAttach: (() -> Void)?
-    private let onTools: (() -> Void)?
 
     /// Creates a composer whose draft and generation state are controlled by its caller.
     ///
@@ -25,17 +23,17 @@ public struct InputBar: View {
     ///   - text: The editable draft. The caller remains responsible for clearing it after a successful send.
     ///   - placeholder: Placeholder shown while the draft is empty.
     ///   - isGenerating: Shows a stop control instead of send when `true`.
-    ///   - maxLines: Maximum number of visible text lines before the field scrolls.
+    ///   - maxLines: Retained for source compatibility; the composer is intentionally single-line.
     ///   - accessoryPanel: Optional content shown when the accessory button is tapped. The supplied view owns its UI and behavior.
     ///   - onSend: Called for a non-empty draft when the user submits it.
     ///   - onStop: Called when generation is active and the stop control is tapped. The control is disabled when omitted.
     ///   - onAttach: Optional attachment action. Its control is hidden when omitted.
-    ///   - onTools: Optional tools/action-menu entry point. Its control is hidden when omitted.
+    ///   - onTools: Retained for source compatibility; the tools button is no longer displayed.
     public init(
         text: Binding<String>,
         placeholder: String = "Message",
         isGenerating: Bool = false,
-        maxLines: Int = 6,
+        maxLines: Int = 1,
         accessoryPanel: AnyView? = nil,
         onSend: @escaping () -> Void,
         onStop: (() -> Void)? = nil,
@@ -45,12 +43,12 @@ public struct InputBar: View {
         self._text = text
         self.placeholder = placeholder
         self.isGenerating = isGenerating
-        self.maxLines = max(1, maxLines)
+        _ = maxLines
         self.accessoryPanel = accessoryPanel
         self.onSend = onSend
         self.onStop = onStop
         self.onAttach = onAttach
-        self.onTools = onTools
+        _ = onTools
     }
 
     private var canSend: Bool {
@@ -59,84 +57,77 @@ public struct InputBar: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            composer
             if isStickerKeyboardPresented, let accessoryPanel {
                 accessoryPanel
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+            composer
         }
-        .background(.regularMaterial)
         .animation(.easeInOut(duration: 0.22), value: isStickerKeyboardPresented)
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField(placeholder, text: $text, axis: .vertical)
+        HStack(spacing: 8) {
+            accessoryButton(systemName: "plus", label: "Add attachment", action: { onAttach?() })
+                .opacity(onAttach == nil ? 0.72 : 1)
+                .disabled(onAttach == nil)
+
+            TextField(placeholder, text: $text, axis: .horizontal)
                 .font(.system(size: 16))
-                .lineLimit(1...maxLines)
+                .lineLimit(1...1)
                 .submitLabel(.send)
                 .focused($isTextFieldFocused)
                 .onSubmit(submit)
                 .accessibilityLabel(placeholder)
-                .padding(.horizontal, 4)
-                .padding(.top, 3)
+                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 10) {
-                if let onAttach {
-                    accessoryButton(systemName: "plus", label: "Add attachment", action: onAttach)
-                }
-                if let onTools {
-                    accessoryButton(systemName: "slider.horizontal.3", label: "Tools", action: onTools)
-                }
+            if accessoryPanel != nil {
+                accessoryButton(
+                    systemName: isStickerKeyboardPresented ? "keyboard" : "face.smiling",
+                    label: isStickerKeyboardPresented ? "Show system keyboard" : "Show sticker keyboard",
+                    action: isStickerKeyboardPresented ? showSystemKeyboard : showStickerKeyboard
+                )
+            } else {
+                accessoryButton(systemName: "face.smiling", label: "Emoji", action: {})
+                    .disabled(true)
+                    .opacity(0.72)
+            }
 
-                Spacer(minLength: 8)
-
-                if isGenerating {
-                    Button { onStop?() } label: {
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(actionForeground)
-                            .frame(width: 36, height: 36)
-                            .background(actionBackground, in: Circle())
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onStop == nil)
-                    .accessibilityLabel("Stop generating")
-                } else if isStickerKeyboardPresented {
-                    accessoryButton(
-                        systemName: "keyboard",
-                        label: "Show system keyboard",
-                        action: showSystemKeyboard
-                    )
-                } else if canSend {
-                    Button(action: submit) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(actionForeground)
-                            .frame(width: 36, height: 36)
-                            .background(actionBackground, in: Circle())
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Send message")
-                } else if accessoryPanel != nil {
-                    accessoryButton(
-                        systemName: "face.smiling",
-                        label: "Show sticker keyboard",
-                        action: showStickerKeyboard
-                    )
+            if isGenerating {
+                Button { onStop?() } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(actionForeground)
+                        .frame(width: 34, height: 34)
+                        .background(actionBackground, in: Circle())
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .disabled(onStop == nil)
+                .accessibilityLabel("Stop generating")
+            } else if canSend {
+                Button(action: submit) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(actionForeground)
+                        .frame(width: 34, height: 34)
+                        .background(actionBackground, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Send message")
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 1)
+        .padding(.vertical, 8)
+        .background {
+            if #available(iOS 26.0, *) {
+                Capsule().fill(.clear).glassEffect(.regular, in: Capsule())
+            } else {
+                Capsule().fill(.regularMaterial)
+            }
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.05), radius: 12, y: 3)
     }
 
     private var actionBackground: Color { Color.primary }
@@ -150,10 +141,16 @@ public struct InputBar: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
-                .background(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.055), in: Circle())
+                .foregroundStyle(.tint)
+                .frame(width: 38, height: 38)
                 .contentShape(Circle())
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Circle().fill(.clear).glassEffect(.regular, in: Circle())
+                    } else {
+                        Circle().fill(.regularMaterial)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

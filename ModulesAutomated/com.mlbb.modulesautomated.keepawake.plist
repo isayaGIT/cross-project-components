@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.mlbb.modulesautomated.keepawake</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-dimsu</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/koripor/Repos/MLBB_MyLifeButBetter/Coding/cross-project-components/ModulesAutomated/logs/keepawake.stdout.log</string>
+  <key>StandardErrorPath</key><string>/Users/koripor/Repos/MLBB_MyLifeButBetter/Coding/cross-project-components/ModulesAutomated/logs/keepawake.stderr.log</string>
+</dict>
+</plist>

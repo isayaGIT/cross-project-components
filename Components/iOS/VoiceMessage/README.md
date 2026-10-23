@@ -5,7 +5,7 @@ A reusable SwiftUI voice-message player for chat messages, social comments, and 
 ## Display modes
 
 - `VoiceMessageDisplayMode.compact`: minimal play control, speaker symbol, and duration. It intentionally does not show a waveform timeline or expose seeking.
-- `VoiceMessageDisplayMode.waveform`: waveform timeline, elapsed/total time, and drag-to-seek interaction. VoiceOver users can adjust the timeline in small increments.
+- `VoiceMessageDisplayMode.waveform`: waveform timeline, elapsed/total time, and drag-to-seek interaction. While dragging, the progress and time bubble track the finger; the player seeks once when the gesture ends. VoiceOver users can adjust the timeline in small increments. No playback-speed control is included.
 
 The host chooses the mode per context. Suggested defaults are `.compact` for private-chat bubbles and comments, and `.waveform` for standalone or longer audio content. The component does not automatically switch modes based on duration, preventing inconsistent layouts in a list.
 
