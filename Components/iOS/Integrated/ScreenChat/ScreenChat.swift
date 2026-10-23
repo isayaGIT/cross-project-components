@@ -8,12 +8,16 @@ public struct ScreenChat: View {
     @State private var draft = ""
     @State private var selectedTheme: ScreenChatTheme = .system
     @State private var isThemePickerPresented = false
+    @State private var isChatSettingsPresented = false
+    @State private var selectedProfile: ProfileCard.Profile?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let title: String
     private let subtitle: String
     private let avatar: Image?
     private let currentUserAvatar: Image?
     private let onBack: (() -> Void)?
+    private let onToggleSidebar: (() -> Void)?
     private let onStopGenerating: (() -> Void)?
     private let isGenerating: Bool
     private let configuration: ScreenChatConfig?
@@ -25,6 +29,7 @@ public struct ScreenChat: View {
         currentUserAvatar: Image? = nil,
         messages: [ScreenChatMessage] = ScreenChatMessage.preview,
         onBack: (() -> Void)? = nil,
+        onToggleSidebar: (() -> Void)? = nil,
         isGenerating: Bool = false,
         onStopGenerating: (() -> Void)? = nil,
         configuration: ScreenChatConfig? = nil
@@ -34,6 +39,7 @@ public struct ScreenChat: View {
         self.avatar = avatar
         self.currentUserAvatar = currentUserAvatar
         self.onBack = onBack
+        self.onToggleSidebar = onToggleSidebar
         self.isGenerating = isGenerating
         self.onStopGenerating = onStopGenerating
         self.configuration = configuration
@@ -51,7 +57,13 @@ public struct ScreenChat: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            navigationHeader
+            HeaderChatScreen(
+                title: title,
+                configuration: config,
+                onBack: onToggleSidebar ?? onBack,
+                onThemePicker: { isThemePickerPresented = true },
+                onChatSettings: { isChatSettingsPresented = true }
+            )
             Divider().overlay(config.separatorColor.opacity(config.separatorOpacity))
 
             // Viewport 1: messages own all remaining space between the header and composer.
@@ -71,6 +83,15 @@ public struct ScreenChat: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .overlay {
+            SheetCustom(
+                isPresented: $isChatSettingsPresented,
+                configuration: SheetCustomConfiguration(height: .fraction(0.38))
+            ) {
+                SheetSettingsChatSettings()
+            }
+        }
+        .overlay { profileCardOverlay }
     }
 
     private var messagesViewport: some View {
@@ -102,71 +123,6 @@ public struct ScreenChat: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 7)
         .padding(.top, 8)
-    }
-
-    private var navigationHeader: some View {
-        HStack(spacing: 12) {
-            if let onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(config.headerIconColor)
-                        .frame(width: 28, height: 42)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("返回")
-            }
-
-            Avatar(
-                image: avatar,
-                width: 42,
-                height: 42,
-                shape: .circle,
-                placeholderStyle: .init(
-                    background: config.avatarPlaceholderBackground,
-                    foreground: config.avatarPlaceholderForeground
-                )
-            )
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(config.titleFont)
-                    .foregroundStyle(config.titleColor)
-                    .lineLimit(1)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(subtitle == "在线" ? config.onlineColor : config.offlineColor)
-                        .frame(width: 6, height: 6)
-                    Text(subtitle)
-                        .font(config.subtitleFont)
-                        .foregroundStyle(config.subtitleColor)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                isThemePickerPresented = true
-            } label: {
-                Image(systemName: "paintpalette")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(config.headerIconColor)
-                    .frame(width: 36, height: 40)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("聊天主题")
-            .accessibilityHint("打开主题选择")
-        }
-        .foregroundStyle(config.titleColor)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background {
-            Rectangle()
-                .fill(config.headerBackground)
-                .ignoresSafeArea(edges: .top)
-        }
     }
 
     private var themePicker: some View {
@@ -227,6 +183,17 @@ public struct ScreenChat: View {
                 avatar: message.isOutgoing ? currentUserAvatar : avatar,
                 timestamp: message.timestamp,
                 configuration: config.messageConfiguration,
+                onAvatarTap: {
+                    let isOutgoing = message.isOutgoing
+                    let profile = ProfileCard.Profile(
+                        name: isOutgoing ? "我" : title,
+                        signature: isOutgoing ? "我的个人资料" : subtitle,
+                        profileImage: message.isOutgoing ? currentUserAvatar : avatar
+                    )
+                    withAnimation(SwiftPiecesProfileCardMotion.reveal(reduceMotion: reduceMotion)) {
+                        selectedProfile = profile
+                    }
+                },
                 content: {
                     AnyView(
                         Text(message.text)
@@ -235,6 +202,39 @@ public struct ScreenChat: View {
                 }
             )
         )
+    }
+
+    @ViewBuilder
+    private var profileCardOverlay: some View {
+        if let profile = selectedProfile {
+            ZStack {
+                Color.black.opacity(0.34)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissProfileCard() }
+                    .transition(.opacity)
+                    .accessibilityLabel("关闭个人资料")
+
+                ProfileCard(profile: profile, style: .default)
+                    .frame(maxWidth: 340)
+                    .padding(.horizontal, 24)
+                    .transition(
+                        .asymmetric(
+                            insertion: SwiftPiecesProfileCardMotion.insertion(reduceMotion: reduceMotion),
+                            removal: SwiftPiecesProfileCardMotion.removal(reduceMotion: reduceMotion)
+                        )
+                    )
+                    .zIndex(1)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .zIndex(100)
+        }
+    }
+
+    private func dismissProfileCard() {
+        withAnimation(SwiftPiecesProfileCardMotion.dismiss(reduceMotion: reduceMotion)) {
+            selectedProfile = nil
+        }
     }
 
     private func sendMessage() {

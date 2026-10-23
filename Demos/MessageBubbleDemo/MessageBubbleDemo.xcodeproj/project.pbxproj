@@ -9,12 +9,14 @@
 /* Begin PBXBuildFile section */
 		1354DB6869232306C8ABD594 /* CrossProjectComponentsIOS in Frameworks */ = {isa = PBXBuildFile; productRef = 43E07AD804BB96BC522CB1B1 /* CrossProjectComponentsIOS */; };
 		D082810F6836FBAF33CE05FD /* MessageBubbleDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59349A0B13094FC15F2C3E18 /* MessageBubbleDemoApp.swift */; };
+		A00000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1C1FBD0C5B16B4882091D0B1 /* cross-project-components */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "cross-project-components"; path = ../..; sourceTree = SOURCE_ROOT; };
 		59349A0B13094FC15F2C3E18 /* MessageBubbleDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleDemoApp.swift; sourceTree = "<group>"; };
 		7EBA8B997508E3529FAAB83F /* MessageBubbleDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MessageBubbleDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				59349A0B13094FC15F2C3E18 /* MessageBubbleDemoApp.swift */,
+				A00000000000000000000002 /* Assets.xcassets */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -71,6 +74,7 @@
 			buildPhases = (
 				B0A792AA3607E8B1CA0310D2 /* Sources */,
 				8F17C59A31314BB2EDEA3548 /* Frameworks */,
+				A00000000000000000000003 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -128,11 +132,21 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin XCBuildConfiguration section */
 		43ABE985B82C5AB9D4566300 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -269,7 +283,6 @@
 		F6AE3F398DA08CD06FA8F0AF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

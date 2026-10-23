@@ -7,6 +7,8 @@
 // tags: [like, bookmark, toggle, reaction, haptic, capsule]
 
 import SwiftUI
+import UIKit
+import LiquidGlassKit
 
 /// Liquid glass reaction toggle with press feel, a tint that floods the glass from the symbol, a rubbery symbol squash,
 /// and an optional rolling count and confirmation pill that buds out of the capsule.
@@ -79,9 +81,6 @@ public struct ReactionToggle: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding private var isOn: Bool
     @State private var flood: CGFloat
-    /// The glass carries the tint at rest. It arrives just behind the flood, so the colour reads as spreading out of
-    /// the symbol rather than switching on.
-    @State private var tinted: Bool
     @State private var burst = 0
     @State private var showsPill = false
     /// The confirmation pill: home inside the capsule, out above it while it shows.
@@ -102,7 +101,6 @@ public struct ReactionToggle: View {
     public init(isOn: Binding<Bool>, systemImage: String = "heart", filledImage: String? = nil, count: Int? = nil, confirmation: String? = nil, size: CGFloat = 24, tint: Color? = nil, style: Style = .standard) {
         _isOn = isOn
         _flood = State(initialValue: isOn.wrappedValue ? 1 : 0)
-        _tinted = State(initialValue: isOn.wrappedValue)
         _size = ScaledMetric(wrappedValue: size, relativeTo: .body)
         self.systemImage = systemImage
         self.filledImage = filledImage ?? "\(systemImage).fill"
@@ -117,7 +115,6 @@ public struct ReactionToggle: View {
     private var height: CGFloat { max(44, size * 2) }
     private var leading: CGFloat { style.isContained ? (height - box) / 2 + 2 : 0 }
     private var total: Int? { count.map { $0 + (isOn ? 1 : 0) } }
-    private var restTint: Color? { style.restFill == .clear ? nil : style.restFill }
     private var pillTint: Color? { style.pillFill == .clear ? nil : style.pillFill }
 
     public var body: some View {
@@ -144,10 +141,8 @@ public struct ReactionToggle: View {
         .accessibilityAddTraits(isOn ? .isSelected : [])
         .onChange(of: isOn) { _, on in
             if on {
-                // The lead: the tint floods out of the symbol while the symbol squashes, on the tap. The glass takes the
-                // tint two beats on, as the flood reaches the rim.
+                // The tint floods out from the symbol while the symbol squashes, under the LiquidGlassKit capsule.
                 withAnimation(motion.morph) { flood = 1 }
-                withAnimation(motion.cascade(motion.morph, index: 2, step: beat)) { tinted = true }
                 if !reduceMotion { burst += 1 }
                 guard confirmation != nil else { return }
                 if style.isContained {
@@ -160,7 +155,6 @@ public struct ReactionToggle: View {
                 // A quiet drain back into the symbol: no overshoot, no haptic.
                 withAnimation(motion.dismiss) {
                     flood = 0
-                    tinted = false
                     showsPill = false
                 }
             }
@@ -226,7 +220,11 @@ public struct ReactionToggle: View {
     private func surface(_ face: some View) -> some View {
         if style.isContained {
             face
-                .pieceLiquid(.capsule, tint: tinted ? fill : restTint, interactive: false)
+                .background {
+                    // Use the repository's LiquidGlassKit renderer instead of replacing the
+                    // capsule with SwiftUI's ordinary material fallback.
+                    ReactionToggleLiquidGlassCapsule()
+                }
                 // Sinks with the glass under a press, so no rim of the tint shows around the pressed capsule.
                 .background { pool.modifier(SinksWithGlass()) }
         } else {
@@ -239,11 +237,18 @@ public struct ReactionToggle: View {
     private var pool: some View {
         GeometryReader { proxy in
             let reach = hypot(proxy.size.width, proxy.size.height) * 1.05
-            Flood(level: reduceMotion ? 1 : flood)
-                .fill(fill)
-                .frame(width: reach * 2, height: reach * 2)
-                .opacity(reduceMotion ? flood : 1)
-                .position(x: leading + box / 2, y: proxy.size.height / 2)
+            ZStack {
+                if style.restFill != .clear {
+                    Capsule().fill(style.restFill)
+                        .opacity(isOn ? 0 : 1)
+                        .animation(PieceMotion(reduceMotion: reduceMotion).morph, value: isOn)
+                }
+                Flood(level: reduceMotion ? 1 : flood)
+                    .fill(fill)
+                    .frame(width: reach * 2, height: reach * 2)
+                    .opacity(reduceMotion ? flood : 1)
+                    .position(x: leading + box / 2, y: proxy.size.height / 2)
+            }
         }
         .clipShape(.capsule)
         .allowsHitTesting(false)
@@ -423,6 +428,44 @@ public struct ReactionToggle: View {
             let ring = CGRect(x: rect.midX - side / 2, y: rect.midY - side / 2, width: side, height: side)
             return Circle().path(in: ring.insetBy(dx: line / 2, dy: line / 2)).strokedPath(StrokeStyle(lineWidth: line))
         }
+    }
+}
+
+/// The capsule material used by ReactionToggle. `isNative: false` deliberately selects the
+/// bundled LiquidGlassKit renderer, including on systems that also provide Apple's native glass.
+private struct ReactionToggleLiquidGlassCapsule: UIViewRepresentable {
+    func makeUIView(context: Context) -> ReactionToggleLiquidGlassContainerView {
+        ReactionToggleLiquidGlassContainerView(
+            effect: LiquidGlassEffect(style: .regular, isNative: false)
+        )
+    }
+
+    func updateUIView(_ uiView: ReactionToggleLiquidGlassContainerView, context: Context) {}
+}
+
+/// Wraps the public LiquidGlassKit view instead of subclassing it across a module boundary.
+/// The wrapper owns capsule geometry and forwards the resolved corner radius to the glass view.
+private final class ReactionToggleLiquidGlassContainerView: UIView {
+    private let glassView: LiquidGlassEffectView
+
+    init(effect: LiquidGlassEffect) {
+        glassView = LiquidGlassEffectView(effect: effect)
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+        addSubview(glassView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        glassView.frame = bounds
+        glassView.layer.cornerRadius = bounds.height / 2
+        glassView.layer.cornerCurve = .continuous
+        glassView.clipsToBounds = true
     }
 }
 

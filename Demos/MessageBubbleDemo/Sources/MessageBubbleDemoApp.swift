@@ -27,6 +27,7 @@ private struct MessageBubbleDemoView: View {
         VStack(alignment: .leading, spacing: 24) {
           introduction
           controls
+          animatedNinePatchPreview
           conversation
           if showGallery { geometryGallery }
         }
@@ -139,6 +140,70 @@ private struct MessageBubbleDemoView: View {
         Label("Show all corner positions", systemImage: "square.on.circle")
       }
       .font(.subheadline)
+    }
+    .padding(16)
+    .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 20, style: .continuous)
+        .strokeBorder(.quaternary, lineWidth: 1)
+    }
+  }
+
+  private var animatedNinePatchPreview: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      sectionHeader("ANIMATED NINE-PATCH", detail: "12 original repository PNG frames · fixed corners · stretchable center")
+      HStack(alignment: .bottom, spacing: 10) {
+        avatar("M", color: .purple)
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Morgan · animated skin")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 5) {
+            Text("The bubble itself is animated.")
+              .font(.system(size: 15, weight: .semibold))
+              .foregroundStyle(.black)
+            Text("This is a longer multi-line message to demonstrate that the bubble grows taller automatically as the text wraps onto additional lines. The frame animation stays behind the full content.")
+              .font(.system(size: 13))
+              .foregroundStyle(.black)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          .padding(.horizontal, 31)
+          .padding(.vertical, 22)
+          .frame(width: 285, alignment: .leading)
+          .background {
+            NinePatchFrameAnimation(
+              frameNames: (1...12).map { String(format: "OriginalBubbleFrame%02d", $0) },
+              sourceSize: CGSize(width: 128, height: 112),
+              // Preserve the source frame's corners; let the central band stretch in both axes.
+              stretchInsets: EdgeInsets(top: 52, leading: 60, bottom: 59, trailing: 67),
+              duration: 1.0,
+              repeatCount: 0
+            )
+          }
+          .accessibilityElement(children: .combine)
+        }
+        Spacer(minLength: 0)
+      }
+      HStack {
+        Spacer(minLength: 44)
+        Text("Mirrored outgoing bubble — this one also grows to fit a longer multi-line message. ✨")
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(.black)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 31)
+          .padding(.vertical, 22)
+          .frame(width: 250, alignment: .leading)
+          .background {
+            NinePatchFrameAnimation(
+              frameNames: (1...12).map { String(format: "OriginalBubbleFrame%02d", $0) },
+              sourceSize: CGSize(width: 128, height: 112),
+              stretchInsets: EdgeInsets(top: 52, leading: 60, bottom: 59, trailing: 67),
+              duration: 0.72,
+              repeatCount: 0,
+              horizontallyMirrored: true
+            )
+          }
+      }
     }
     .padding(16)
     .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -306,11 +371,13 @@ private struct MessageBubbleDemoView: View {
   }
 
   private func avatar(_ letter: String, color: Color) -> some View {
-    Text(letter)
-      .font(.system(size: 13, weight: .bold))
-      .foregroundStyle(.white)
-      .frame(width: 30, height: 30)
-      .background(color.gradient, in: Circle())
+    Image("OriginalCatAvatar")
+      .resizable()
+      .scaledToFill()
+      .frame(width: 34, height: 34)
+      .clipShape(Circle())
+      .overlay(Circle().strokeBorder(.white.opacity(0.75), lineWidth: 1))
+      .accessibilityLabel("Original repository cat avatar")
   }
 
   private func sectionHeader(_ title: String, detail: String) -> some View {

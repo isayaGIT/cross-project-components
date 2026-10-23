@@ -5,3 +5,6 @@ These files are sourced from the official SwiftPieces registry using `npx swiftp
 Upstream license: MIT + Commons Clause. The Commons Clause restricts selling, sublicensing, or redistributing the components themselves, including bundled or ported versions. Do not publish or redistribute these source files without checking the current license terms and obtaining any required permission.
 
 The existing component entry points in this repository delegate to these implementations where applicable. `Demos/ComponentShowcase` exercises the upstream implementations directly.
+
+
+`Sheets/ProfileCardPresentationMotion.swift` adapts the Swift Pieces `PieceMotion` reveal/dismiss roles for the ProfileCard overlay. It is intentionally limited to presentation timing and transitions; `MessageChunk` emits the avatar tap callback, while the screen-level presenter owns presentation state and backdrop dismissal.

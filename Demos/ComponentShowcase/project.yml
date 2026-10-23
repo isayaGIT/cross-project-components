@@ -42,6 +42,14 @@ targets:
         name: SwiftPiecesNoticeStack.swift
       - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Feedback/ReactionToggle/ReactionToggle.swift
         name: ReactionToggle.swift
+      - path: ../../Components/iOS/Trivial/Sheet-ConfigSheet/ConfigSheet.swift
+        name: ConfigSheet.swift
+      - path: ../../Components/iOS/Trivial/ListApiConfig/ListApiConfig.swift
+        name: ListApiConfig.swift
+      - path: ../../Components/iOS/Trivial/ListNode-LlmProviders/ListNodeLlmProviders.swift
+        name: ListNodeLlmProviders.swift
+      - path: ../../Components/iOS/Integrated/Sheet-LlmApiKeyConfigSheet/SheetLlmApiKeyConfigSheet.swift
+        name: SheetLlmApiKeyConfigSheet.swift
     dependencies:
       - package: Animated
     settings:

@@ -1,0 +1,14 @@
+{
+  "protocolVersion": "1.0",
+  "id": "cute-animals",
+  "name": "Cute Animals",
+  "shortDescription": "Animated animal stickers",
+  "tags": ["animals", "cute"],
+  "cover": {"assetID": "cute-animals-cover", "role": "cover"},
+  "version": "3",
+  "stickers": [
+    {"id": "cat-wave", "name": "Waving Cat", "tags": ["cat", "hello"], "media": {"assetID": "cat-wave-gif", "role": "animated-sticker"}, "thumbnail": {"assetID": "cat-wave-preview", "role": "thumbnail"}, "parameters": {"assetID": "cat-wave-params", "role": "animation-parameters"}}
+  ],
+  "publisher": "Example Studio",
+  "updatedAt": "2026-10-24T00:00:00Z"
+}

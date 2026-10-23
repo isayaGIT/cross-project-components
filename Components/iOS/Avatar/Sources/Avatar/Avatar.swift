@@ -77,6 +77,7 @@ public struct Avatar: View {
     private let placeholderStyle: PlaceholderStyle
     private let pokeEnabled: Bool
     private let vibration: CGFloat
+    private let onTap: (() -> Void)?
     @State private var pokeTrigger = 0
 
     public init(
@@ -88,7 +89,8 @@ public struct Avatar: View {
         placeholder: Image? = nil,
         placeholderStyle: PlaceholderStyle = .default,
         pokeEnabled: Bool = false,
-        vibration: CGFloat = 0
+        vibration: CGFloat = 0,
+        onTap: (() -> Void)? = nil
     ) {
         self.image = image
         self.width = max(0, width)
@@ -99,6 +101,7 @@ public struct Avatar: View {
         self.placeholderStyle = placeholderStyle
         self.pokeEnabled = pokeEnabled
         self.vibration = min(max(vibration, 0), 1)
+        self.onTap = onTap
     }
 
     public init(image: Image?, configuration: Configuration) {
@@ -143,11 +146,17 @@ public struct Avatar: View {
         .clipShape(ResolvedAvatarShape(shape: shape))
         .modifier(PokeShakeEffect(animatableData: CGFloat(pokeTrigger)))
         .animation(.linear(duration: 0.5), value: pokeTrigger)
-        .onTapGesture(count: 2) {
-            guard pokeEnabled else { return }
-            triggerPokeFeedback()
-            pokeTrigger += 1
-        }
+        .modifier(AvatarTapRouting(
+            pokeEnabled: pokeEnabled,
+            onTap: onTap,
+            onPoke: triggerPoke
+        ))
+        .accessibilityAddTraits(onTap == nil ? [] : .isButton)
+    }
+
+    private func triggerPoke() {
+        triggerPokeFeedback()
+        pokeTrigger += 1
     }
 
     /// Emits a system haptic on iOS when vibration is greater than zero.
@@ -198,6 +207,50 @@ private struct ResolvedAvatarShape: Shape {
     }
 }
 
+
+/// Routes avatar taps through one recognizer when single-tap and poke actions coexist.
+/// Double-tap wins; a single tap is delivered only after the double-tap sequence fails.
+private struct AvatarTapRouting: ViewModifier {
+    let pokeEnabled: Bool
+    let onTap: (() -> Void)?
+    let onPoke: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if pokeEnabled, let onTap {
+            content
+                .contentShape(Rectangle())
+                .gesture(
+                    TapGesture(count: 2)
+                        .exclusively(before: TapGesture(count: 1))
+                        .onEnded { result in
+                            switch result {
+                            case .first:
+                                onPoke()
+                            case .second:
+                                onTap()
+                            @unknown default:
+                                break
+                            }
+                        }
+                )
+                .accessibilityLabel("打开个人资料")
+                .accessibilityHint("双击以拍一拍")
+        } else if pokeEnabled {
+            content
+                .onTapGesture(count: 2, perform: onPoke)
+                .accessibilityHint("Double-tap to poke this avatar")
+        } else if let onTap {
+            Button(action: onTap) {
+                content.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("打开个人资料")
+        } else {
+            content
+        }
+    }
+}
 
 /// Reproduces the short, bottom-anchored wobble used by chat-app "poke" interactions.
 private struct PokeShakeEffect: GeometryEffect {

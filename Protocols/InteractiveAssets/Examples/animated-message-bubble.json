@@ -1,0 +1,12 @@
+{
+  "protocolVersion": "1.0",
+  "id": "bubble.pink.sparkle",
+  "version": "1",
+  "renderer": "nine-patch-frames",
+  "background": {"assetID": "pink-bubble-first-frame", "role": "background-frame"},
+  "decorations": [
+    {"id": "sparkle-top-right", "asset": {"assetID": "sparkle-lottie", "role": "decoration-animation"}, "placement": "overlapping", "width": 44, "height": 44, "alignment": "topTrailing", "offsetX": 2, "offsetY": -4, "loop": "loop"}
+  ],
+  "layout": {"cornerRadius": 18, "paddingTop": 12, "paddingLeading": 16, "paddingBottom": 12, "paddingTrailing": 16},
+  "parameters": {"assetID": "pink-bubble-ninepatch-config", "role": "renderer-parameters"}
+}

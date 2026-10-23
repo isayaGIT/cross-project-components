@@ -1,0 +1,3 @@
+[submodule "dependencies/NinePatchStudio"]
+	path = dependencies/NinePatchStudio
+	url = https://github.com/isayaGIT/ninepatch-studio.git

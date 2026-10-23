@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cross-project-components.invalid/protocols/interactive-assets/1.0/sticker-library.schema.json",
+  "title": "Sticker Library Catalog", "type": "object", "additionalProperties": false,
+  "required": ["protocolVersion", "id", "name", "version", "packIDs"],
+  "properties": {
+    "protocolVersion": {"const": "1.0"}, "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1},
+    "packIDs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "publisher": {"type": "string"}, "updatedAt": {"type": "string", "format": "date-time"}
+  }
+}

@@ -23,7 +23,11 @@ public struct SheetCustomConfiguration {
     }
 
     public var height: SheetCustomHeight
-    public var background: Color
+    public var background: Color {
+        didSet { usesDefaultMaterialBackground = false }
+    }
+    /// Uses the native translucent material when no background is explicitly supplied.
+    fileprivate var usesDefaultMaterialBackground: Bool
     public var customBackground: Background?
     public var borderLine: AnyView?
     public var border: Color?
@@ -49,6 +53,7 @@ public struct SheetCustomConfiguration {
     ) {
         self.height = height
         self.background = background ?? Self.defaultBackground
+        self.usesDefaultMaterialBackground = background == nil && customBackground == nil
         self.customBackground = customBackground
         self.borderLine = borderLine
         self.border = border
@@ -119,6 +124,9 @@ public struct SheetCustom<Content: View>: View {
         Group {
             if let customBackground = configuration.customBackground {
                 customBackground
+            } else if configuration.usesDefaultMaterialBackground {
+                // Match the translucent, blurred system-sheet appearance by default.
+                Rectangle().fill(.regularMaterial)
             } else {
                 configuration.background
             }

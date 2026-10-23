@@ -1,5 +1,6 @@
 import SwiftUI
 import LineDashed
+import Lottie
 
 /// The visual silhouette used by `MessageBubble`, backed by the reusable shape in Shapes/RoundedRectSmoothed.
 public enum MessageBubbleStyle: Sendable, Equatable {
@@ -90,6 +91,7 @@ public struct MessageBubble<Content: View>: View {
         public var timestampFont: Font
         public var font: Font
         public var lineSpacing: CGFloat
+        public var theme: MessageBubbleTheme
 
         public init(
             cornerRadius: CGFloat = 16,
@@ -106,7 +108,8 @@ public struct MessageBubble<Content: View>: View {
             timestampColor: Color = .secondary,
             timestampFont: Font = .caption2,
             font: Font = .body,
-            lineSpacing: CGFloat = 0
+            lineSpacing: CGFloat = 0,
+            theme: MessageBubbleTheme = .default
         ) {
             self.cornerRadius = cornerRadius
             self.sharpCorner = sharpCorner
@@ -123,6 +126,7 @@ public struct MessageBubble<Content: View>: View {
             self.timestampFont = timestampFont
             self.font = font
             self.lineSpacing = lineSpacing
+            self.theme = theme
         }
     }
     private let cornerRadius: CGFloat
@@ -140,6 +144,7 @@ public struct MessageBubble<Content: View>: View {
     private let timestampFont: Font
     private let font: Font
     private let lineSpacing: CGFloat
+    private let theme: MessageBubbleTheme
     private let content: Content
 
     /// Creates a bubble using the system accent color.
@@ -158,6 +163,7 @@ public struct MessageBubble<Content: View>: View {
         timestampFont: Font = .caption2,
         font: Font = .body,
         lineSpacing: CGFloat = 0,
+        theme: MessageBubbleTheme = .default,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
@@ -176,6 +182,7 @@ public struct MessageBubble<Content: View>: View {
             timestampFont: timestampFont,
             font: font,
             lineSpacing: lineSpacing,
+            theme: theme,
             content: content
         )
     }
@@ -197,6 +204,7 @@ public struct MessageBubble<Content: View>: View {
         timestampFont: Font = .caption2,
         font: Font = .body,
         lineSpacing: CGFloat = 0,
+        theme: MessageBubbleTheme = .default,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = max(0, cornerRadius)
@@ -214,6 +222,7 @@ public struct MessageBubble<Content: View>: View {
         self.timestampFont = timestampFont
         self.font = font
         self.lineSpacing = max(0, lineSpacing)
+        self.theme = theme
         self.content = content()
     }
 
@@ -238,6 +247,7 @@ public struct MessageBubble<Content: View>: View {
             timestampFont: configuration.timestampFont,
             font: configuration.font,
             lineSpacing: configuration.lineSpacing,
+            theme: configuration.theme,
             content: content
         )
     }
@@ -259,6 +269,7 @@ public struct MessageBubble<Content: View>: View {
             timestampFont: configuration.timestampFont,
             font: configuration.font,
             lineSpacing: configuration.lineSpacing,
+            theme: configuration.theme,
             content: content
         )
     }
@@ -276,6 +287,15 @@ public struct MessageBubble<Content: View>: View {
                 .frame(width: width, height: height, alignment: alignment)
                 .background {
                     bubbleShape.fill(fill)
+                }
+                .overlay {
+                    MessageBubbleDecorationLayer(theme: theme)
+                        .clipShape(bubbleShape)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .topLeading) {
+                    MessageBubbleDecorationLayer(theme: theme, placement: .overlapping)
+                        .allowsHitTesting(false)
                 }
                 .overlay {
                     GeometryReader { geometry in

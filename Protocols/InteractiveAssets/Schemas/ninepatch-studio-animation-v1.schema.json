@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cross-project-components.invalid/protocols/interactive-assets/1.0/ninepatch-studio-animation-v1.schema.json",
+  "title": "NinePatchStudio Animation Export v1", "type": "object", "additionalProperties": false,
+  "required": ["format", "sourceFileName", "sourceWidth", "sourceHeight", "frameCount", "totalDuration", "frames", "stretchInsets", "contentInsets"],
+  "properties": {
+    "format": {"const": "ninepatch-studio/animation-v1"}, "sourceFileName": {"type": "string", "minLength": 1},
+    "sourceWidth": {"type": "integer", "minimum": 1}, "sourceHeight": {"type": "integer", "minimum": 1},
+    "frameCount": {"type": "integer", "minimum": 1}, "totalDuration": {"type": "number", "exclusiveMinimum": 0},
+    "frames": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["fileName", "duration"], "properties": {"fileName": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$"}, "duration": {"type": "number", "exclusiveMinimum": 0}}}},
+    "stretchInsets": {"$ref": "#/$defs/insets"}, "contentInsets": {"$ref": "#/$defs/insets"},
+    "integrationNote": {"type": "string"}
+  },
+  "$defs": {"insets": {"type": "object", "additionalProperties": false, "required": ["top", "left", "bottom", "right"], "properties": {"top": {"type": "number", "minimum": 0}, "left": {"type": "number", "minimum": 0}, "bottom": {"type": "number", "minimum": 0}, "right": {"type": "number", "minimum": 0}}}}
+}

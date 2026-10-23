@@ -1,0 +1,9 @@
+{
+  "protocolVersion": "1.0",
+  "id": "community",
+  "name": "Community Sticker Library",
+  "version": "1",
+  "packIDs": ["cute-animals", "food"],
+  "publisher": "Example Studio",
+  "updatedAt": "2026-10-24T00:00:00Z"
+}

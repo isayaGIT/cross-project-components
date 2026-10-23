@@ -1,0 +1,35 @@
+name: AssetServerSample
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  InteractiveAssets:
+    path: ../../../../Protocols/InteractiveAssets
+targets:
+  AssetServerSample:
+    type: application
+    platform: iOS
+    dependencies:
+      - package: InteractiveAssets
+        product: InteractiveAssets
+    sources:
+      - path: .
+        excludes:
+          - "AssetServerSample.xcodeproj/**"
+          - "build/**"
+          - "project.yml"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.assetserversample
+        PRODUCT_NAME: AssetServerSample
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+schemes:
+  AssetServerSample:
+    build:
+      targets:
+        AssetServerSample: all
+    run:
+      config: Debug

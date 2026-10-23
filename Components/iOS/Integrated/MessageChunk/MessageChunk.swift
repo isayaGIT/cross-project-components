@@ -60,8 +60,8 @@ public struct MessageChunk<Content: View>: View {
             )
             var incomingAvatar = Avatar.Configuration(width: 34, height: 34, shape: .circle, placeholderStyle: placeholder)
             var outgoingAvatar = incomingAvatar
-            incomingAvatar.pokeEnabled = false
-            outgoingAvatar.pokeEnabled = false
+            incomingAvatar.pokeEnabled = true
+            outgoingAvatar.pokeEnabled = true
             var incomingBubble = MessageBubble<AnyView>.Configuration(
                 sharpCorner: .bottomLeading,
                 style: .roundedTail,
@@ -99,6 +99,7 @@ public struct MessageChunk<Content: View>: View {
     private let timestamp: String?
     private let configuration: Configuration
     private let content: Content
+    private let onAvatarTap: (() -> Void)?
     @Environment(\.colorScheme) private var colorScheme
 
     public init(
@@ -107,6 +108,7 @@ public struct MessageChunk<Content: View>: View {
         incomingAvatar: Image? = nil,
         timestamp: String? = nil,
         configuration: Configuration? = nil,
+        onAvatarTap: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.direction = direction
@@ -114,6 +116,7 @@ public struct MessageChunk<Content: View>: View {
         self.incomingAvatar = incomingAvatar
         self.timestamp = timestamp
         self.configuration = configuration ?? .screenChat(colorScheme: .light)
+        self.onAvatarTap = onAvatarTap
         self.content = content()
     }
 
@@ -123,12 +126,12 @@ public struct MessageChunk<Content: View>: View {
                 Spacer(minLength: 0)
                 bubble(isOutgoing: true)
                 if configuration.showsAvatar {
-                    Avatar(image: avatar, configuration: configuration.outgoingAvatar)
+                    avatarView(image: avatar, configuration: configuration.outgoingAvatar)
                         .offset(y: -2)
                 }
             } else {
                 if configuration.showsAvatar {
-                    Avatar(image: incomingAvatar ?? avatar, configuration: configuration.incomingAvatar)
+                    avatarView(image: incomingAvatar ?? avatar, configuration: configuration.incomingAvatar)
                         .offset(y: -2)
                 }
                 bubble(isOutgoing: false)
@@ -136,6 +139,22 @@ public struct MessageChunk<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func avatarView(image: Image?, configuration: Avatar.Configuration) -> some View {
+        Avatar(
+            image: image,
+            width: configuration.width,
+            height: configuration.height,
+            shape: configuration.shape,
+            scaling: configuration.scaling,
+            placeholder: configuration.placeholder,
+            placeholderStyle: configuration.placeholderStyle,
+            pokeEnabled: configuration.pokeEnabled,
+            vibration: configuration.vibration,
+            onTap: onAvatarTap
+        )
     }
 
     @ViewBuilder

@@ -1,0 +1,950 @@
+// Copyright (c) 2026 Saivion Hayes
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, and distribute the Software as part of
+// an application, website, or product, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// Commons Clause Restriction
+//
+// You may use this Software, including for any commercial purpose, so long as
+// you do not sell, sublicense, or redistribute the components themselves, whether
+// alone, in a bundle, or as a ported version.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+import SwiftUI
+
+/// Idle, loading, success, and failure in one ring that lands as a solid block, with an optional caption on a glass pill.
+///
+/// - Parameters:
+///   - state: `.idle`, `.loading`, `.success`, or `.failure`.
+///   - captions: Optional caption per state, on a glass pill under the ring. A changed caption morphs letter by letter, so "Saving" becomes "Saved" in place; a caption that appears rises in, and one that goes sinks away. Use `.saving` for "Saving / Saved / Failed".
+///   - size: Ring diameter in points; scales with Dynamic Type.
+///   - lineWidth: Stroke width for the ring, check, and cross.
+///   - tint: Overrides the success block color. Defaults to `style.success`.
+///   - pops: Soft scale pop when success lands.
+///   - style: Block, stroke and caption colors. `.standard` lands sage for success and the brand red for failure, with dark ink marks.
+public struct StatusMorph: View {
+    public enum State: Hashable, Sendable { case idle, loading, success, failure }
+
+    /// Colors for each state. Defaults follow the SwiftPieces house palette and adapt to light and dark.
+    public struct Style: Sendable {
+        /// Block the ring floods into on success.
+        public var success: Color
+        /// Block the ring floods into on failure.
+        public var failure: Color
+        /// Check and cross color on the blocks.
+        public var ink: Color
+        /// The spinning arc and idle stroke.
+        public var stroke: Color
+        /// The quiet track behind the arc.
+        public var track: Color
+        /// Caption color on its glass pill while idle or loading.
+        public var muted: Color
+        /// Caption color on its glass pill once settled.
+        public var text: Color
+
+        public init(
+            success: Color = Style.sage,
+            failure: Color = Style.tangerine,
+            ink: Color = Style.blockInk,
+            stroke: Color = Style.adaptive(0x141414, 0xF4F3EF),
+            track: Color = Style.adaptive(0xE7E5DF, 0x2E2E2E),
+            muted: Color = Style.adaptive(0x5C5A56, 0xA6A49F),
+            text: Color = Style.adaptive(0x141414, 0xF4F3EF)
+        ) {
+            self.success = success
+            self.failure = failure
+            self.ink = ink
+            self.stroke = stroke
+            self.track = track
+            self.muted = muted
+            self.text = text
+        }
+
+        public static let standard = Style()
+
+        public static let sage = Color(red: 0xA9 / 255, green: 0xDC / 255, blue: 0xB7 / 255)
+        /// The brand red, `#FF0000`, kept under its earlier name so existing code still compiles.
+        public static let tangerine = Color(red: 1, green: 0, blue: 0)
+        public static let sky = Color(red: 0x9C / 255, green: 0xC2 / 255, blue: 1)
+        public static let butter = Color(red: 1, green: 0xD9 / 255, blue: 0x76 / 255)
+        public static let blockInk = Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255)
+
+        /// A color that resolves to `light` or `dark` hex by the current appearance.
+        public static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+            Color(uiColor: UIColor { @Sendable traits in traits.userInterfaceStyle == .dark ? rgb(dark) : rgb(light) })
+        }
+
+        nonisolated private static func rgb(_ hex: UInt32) -> UIColor {
+            UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+    }
+
+    /// Captions for each state; `nil` hides the caption in that state.
+    public struct Captions: Sendable {
+        public var idle: String?
+        public var loading: String?
+        public var success: String?
+        public var failure: String?
+
+        public init(idle: String? = nil, loading: String? = nil, success: String? = nil, failure: String? = nil) {
+            self.idle = idle
+            self.loading = loading
+            self.success = success
+            self.failure = failure
+        }
+
+        public static let saving = Captions(loading: "Saving", success: "Saved", failure: "Failed")
+
+        func text(for state: State) -> String? {
+            switch state {
+            case .idle: idle
+            case .loading: loading
+            case .success: success
+            case .failure: failure
+            }
+        }
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var size: CGFloat = 32
+    /// The state the ring draws. It changes inside the choreography, never ahead of it, so the ring can't
+    /// render a change that is only half applied.
+    @SwiftUI.State private var shown: State = .idle
+    /// The arc turns on the clock while `spinning`. `restAngle` is where it rests, and where a spin starts from.
+    @SwiftUI.State private var spinning = false
+    @SwiftUI.State private var spinStart: Date = .now
+    @SwiftUI.State private var restAngle: Double = 0
+    @SwiftUI.State private var ringTrim: CGFloat = 0
+    /// How far the block has flooded in from the ring: 0 is the ring alone, 1 a solid disc.
+    @SwiftUI.State private var flood: CGFloat = 0
+    /// The outcome whose color fills the block. A draining block keeps it, so it leaves in its own color while only
+    /// the arc turns back to ink.
+    @SwiftUI.State private var filled: State = .success
+    /// True once the block has drained away, so the next one takes its color at once instead of turning from the last.
+    @SwiftUI.State private var drained = true
+    /// How much of the block the marks show through. Draining, it goes with the block, so ink never shows over the
+    /// open center. Drawing in, it is the whole block, so a mark drawn across the closing center never breaks.
+    @SwiftUI.State private var inkWindow: CGFloat = 0
+    @SwiftUI.State private var checkTrim: CGFloat = 0
+    @SwiftUI.State private var crossTrim: CGFloat = 0
+    /// Counts outcomes, so a landing or a drain from before the latest one never finishes late.
+    @SwiftUI.State private var outcomes = 0
+    /// The outcome on its way in, until it lands.
+    @SwiftUI.State private var landing: State?
+    /// The caption on the pill, and whether it reads as settled. They change on the caption's own beat, two beats behind
+    /// an outcome, so the word lands with its mark.
+    @SwiftUI.State private var caption: String?
+    @SwiftUI.State private var captionSettled = false
+    /// Outcomes that have landed. The pop and the shake key off these.
+    @SwiftUI.State private var successes = 0
+    @SwiftUI.State private var failures = 0
+    /// One haptic per outcome: as it lands, or at once if it is left for idle before it lands.
+    @SwiftUI.State private var successesFelt = 0
+    @SwiftUI.State private var failuresFelt = 0
+
+    private let state: State
+    private let captions: Captions?
+    private let lineWidth: CGFloat
+    private let tint: Color?
+    private let pops: Bool
+    private let style: Style
+    private let arcLength: CGFloat = 0.72
+    private let turnsPerSecond: Double = 1.1
+    /// A spin reaches full speed from rest over about three of these, so it never starts with a jolt.
+    private let spinUp: Double = 0.15
+    /// An outcome arrives in parts one beat apart: the ring closes, the block floods, the mark draws. They overlap,
+    /// so the three read as one stroke; `cascade` lands them together under Reduce Motion.
+    private let beat: Double = 0.16
+    /// Under Reduce Motion the loading arc holds still and breathes in opacity on this period instead of turning.
+    private let breathPeriod: Double = 1.2
+
+    public init(state: State, captions: Captions? = nil, size: CGFloat = 32, lineWidth: CGFloat = 3, tint: Color? = nil, pops: Bool = true, style: Style = .standard) {
+        self.state = state
+        self.captions = captions
+        _caption = SwiftUI.State(initialValue: captions?.text(for: state))
+        _captionSettled = SwiftUI.State(initialValue: state == .success || state == .failure)
+        _size = ScaledMetric(wrappedValue: size, relativeTo: .body)
+        self.lineWidth = lineWidth
+        self.tint = tint
+        self.pops = pops
+        self.style = style
+    }
+
+    private func block(for state: State) -> Color {
+        state == .failure ? style.failure : (tint ?? style.success)
+    }
+
+    public var body: some View {
+        VStack(spacing: max(PieceLiquid.joined, size * 0.1)) {
+            ring
+                .frame(width: size, height: size)
+                .piecePop(trigger: successes, amount: pops ? 0.08 : 0)
+                .pieceShake(trigger: failures, distance: max(3, size * 0.06))
+            if captions != nil { captionSlot }
+        }
+        .fontWeight(.semibold)
+        .sensoryFeedback(.success, trigger: successesFelt)
+        .sensoryFeedback(.error, trigger: failuresFelt)
+        .onAppear { apply(from: nil, to: state) }
+        .onChange(of: state) { old, new in apply(from: old, to: new) }
+        .task(id: state) { await showCaption(for: state) }
+        // A spin picked up after Reduce Motion turns off starts from rest where the arc lies, rather than mid-turn.
+        .onChange(of: reduceMotion) { spinStart = .now }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(captions?.text(for: state) ?? label)
+        .accessibilityAddTraits(state == .loading ? .updatesFrequently : [])
+    }
+
+    private var captionSize: CGFloat { max(12, size * 0.2) }
+    private var captionFont: Font { .system(size: captionSize, weight: .semibold) }
+
+    /// The caption sits on a glass pill under the ring. The slot keeps the pill's height whether or not a caption shows,
+    /// so the ring never moves when one arrives or leaves.
+    private var captionSlot: some View {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        return ZStack {
+            Text("Ag")
+                .font(captionFont)
+                .padding(.vertical, captionSize * 0.36)
+                .hidden()
+            PieceLiquidGroup {
+                if let caption {
+                    // Letters the two words share hold still and the rest blur through, so "Saving" becomes "Saved"
+                    // in place. Quiet while working, full ink once settled.
+                    PieceMorphText(text: caption, font: captionFont)
+                        .foregroundStyle(captionSettled ? style.text : style.muted)
+                        .padding(.horizontal, captionSize * 0.75)
+                        .padding(.vertical, captionSize * 0.36)
+                        .pieceLiquid(.capsule, interactive: false)
+                        // With no glass to bud from, the pill rises in on its own and sinks away as it leaves.
+                        .transition(motion.transition(.opacity.combined(with: .offset(y: captionSize * 0.5))))
+                }
+            }
+        }
+    }
+
+    /// Moves the caption to `state`'s. An outcome's word arrives two beats after the change, so it lands with the mark
+    /// it names; a new caption rises in on the reveal, a changed one morphs, and one that goes sinks away.
+    private func showCaption(for state: State) async {
+        let next = captions?.text(for: state)
+        let settled = state == .success || state == .failure
+        guard next != caption || settled != captionSettled else { return }
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        if settled, !reduceMotion {
+            try? await Task.sleep(for: .seconds(2 * beat))
+            guard !Task.isCancelled else { return }
+        }
+        withAnimation(next == nil ? motion.dismiss : caption == nil ? motion.reveal : motion.morph) {
+            caption = next
+            captionSettled = settled
+        }
+    }
+
+    private var label: String {
+        switch state {
+        case .idle: "Idle"
+        case .loading: "Loading"
+        case .success: "Success"
+        case .failure: "Failed"
+        }
+    }
+
+    private var ring: some View {
+        let quiet = shown == .idle || shown == .loading
+        let tone = quiet ? style.stroke : block(for: shown)
+        let inkWidth = max(lineWidth, size * 0.07)
+        // Copied out of state for the timeline, which re-runs its closure every frame while the arc turns or breathes.
+        let turning = spinning && !reduceMotion
+        // Under Reduce Motion the loading arc holds still and breathes in opacity, so it still reads as working.
+        let breathing = shown == .loading && reduceMotion
+        let start = spinStart, rest = restAngle, trim = ringTrim
+        let stroke = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        return ZStack {
+            Circle()
+                .stroke(style.track, lineWidth: lineWidth)
+                .padding(lineWidth / 2)
+                .opacity(quiet ? 1 : 0)
+            // The block floods inward from the closed ring, and drains back out into it in its own color.
+            Flood(level: flood)
+                .fill(block(for: filled), style: FillStyle(eoFill: true))
+            TimelineView(.animation(paused: !turning && !breathing)) { context in
+                let t = context.date.timeIntervalSince(start)
+                let angle = turning ? rest + spun(t) : rest
+                Circle()
+                    .trim(from: 0, to: trim)
+                    .stroke(tone, style: stroke)
+                    .rotationEffect(.degrees(angle - 90))
+                    .opacity(breathing ? breath(t) : 1)
+            }
+            .padding(lineWidth / 2)
+            // The ink sits on the block, so a mark never shows over the open center.
+            ZStack {
+                Mark(cross: false, progress: checkTrim, lineWidth: inkWidth)
+                    .fill(style.ink)
+                    .padding(size * 0.29)
+                Mark(cross: true, progress: crossTrim, lineWidth: inkWidth)
+                    .fill(style.ink)
+                    .padding(size * 0.33)
+            }
+            .mask { Flood(level: inkWindow).fill(style: FillStyle(eoFill: true)) }
+        }
+    }
+
+    /// The choreography, in beats. The ring stays one stroke throughout: leaving loading, it coasts to rest at the
+    /// speed it was turning while it closes; a beat later it floods inward into the block, and the outcome lands as
+    /// the block closes; a beat after the flood the mark draws. A change that arrives mid-flight retargets from
+    /// wherever the ring is.
+    private func apply(from old: State?, to new: State) {
+        let motion = PieceMotion(reduceMotion: reduceMotion)
+        let settled = new == .success || new == .failure
+        let wasSettled = old == .success || old == .failure
+        let trim: CGFloat = settled ? 1 : (new == .loading ? arcLength : 0)
+        // An outcome left for idle before it lands is still felt, at once and without the pop or shake. A retry or
+        // the other outcome replaces it, so only the newer one is felt.
+        if let unlanded = landing, new == .idle { feel(unlanded) }
+        landing = nil
+        if settled { outcomes += 1 }
+        let outcome = outcomes
+        var instant = Transaction()
+        instant.disablesAnimations = true
+
+        guard old != nil else {
+            // Appearing already in a state shows its final pose without replaying the morph or its haptic.
+            withTransaction(instant) {
+                shown = new
+                ringTrim = trim
+                flood = settled ? 1 : 0
+                inkWindow = settled ? 1 : 0
+                if settled { filled = new }
+                checkTrim = new == .success ? 1 : 0
+                crossTrim = new == .failure ? 1 : 0
+            }
+            drained = !settled
+            spinStart = .now
+            // Loading spins whatever the setting; `turning` decides whether it turns or breathes, so switching
+            // Reduce Motion mid-load never leaves a frozen arc.
+            spinning = new == .loading
+            return
+        }
+
+        coast(motion)
+        if new == .loading {
+            // Starts from rest wherever the stroke lies, so the ring opens without a jump.
+            spinStart = .now
+            spinning = true
+        }
+        // The mark that no longer applies un-draws first, quickly.
+        withAnimation(motion.dismiss) {
+            if new != .success { checkTrim = 0 }
+            if new != .failure { crossTrim = 0 }
+        }
+        if settled {
+            if drained {
+                // An empty block takes the new color at once, so it floods in that color from its first frame. The
+                // mark draws a beat after the flood, so it sees all of the block at once and a stroke drawn across the
+                // closing center never breaks. Under Reduce Motion they land together, so it shows as the block fills.
+                withTransaction(instant) {
+                    filled = new
+                    if !reduceMotion { inkWindow = 1 }
+                }
+            }
+            drained = false
+        }
+        // The container: one stroke that closes, opens or retracts, and takes the state's color. Idle is an exit.
+        // A block caught draining turns to the new color with it.
+        let container = new == .idle ? motion.dismiss : motion.morph
+        withAnimation(container) {
+            shown = new
+            ringTrim = trim
+            if settled, !wasSettled {
+                filled = new
+                inkWindow = 1
+            }
+        }
+        guard settled else {
+            // Draining, the block goes with the ring in its own color, and the marks show only through what is left
+            // of it. Once it is empty, the next block can take its color at once.
+            if wasSettled {
+                withAnimation(container) {
+                    flood = 0
+                    inkWindow = 0
+                } completion: {
+                    if outcome == outcomes { drained = true }
+                }
+            }
+            return
+        }
+        landing = new
+        // A beat behind the ring the block floods in, or recolors if it is already full. The outcome lands as it
+        // closes, while the mark finishes: the haptic and the pop or shake on one beat.
+        withAnimation(motion.cascade(motion.morph, index: 1, step: beat)) {
+            flood = 1
+            filled = new
+        } completion: {
+            guard outcome == outcomes, landing == new else { return }
+            land(new)
+        }
+        // A beat after the flood, the mark draws.
+        withAnimation(motion.cascade(motion.morph, index: 2, step: beat)) {
+            if new == .success { checkTrim = 1 } else { crossTrim = 1 }
+        }
+    }
+
+    /// The outcome lands: its haptic, and the pop or the shake, on one beat.
+    private func land(_ outcome: State) {
+        landing = nil
+        feel(outcome)
+        if outcome == .success { successes += 1 } else { failures += 1 }
+    }
+
+    /// Plays the outcome's haptic.
+    private func feel(_ outcome: State) {
+        if outcome == .success { successesFelt += 1 } else { failuresFelt += 1 }
+    }
+
+    /// Stops a spin where the arc is and lets it coast to rest at the speed it was turning, so it never stops
+    /// dead or whips round to a fixed angle. It runs at calm's pace without its give: a wheel slowed by friction
+    /// never swings back. A literal on purpose, tied to calm's duration; no role pairs that pace with no give.
+    private func coast(_ motion: PieceMotion) {
+        guard spinning else { return }
+        guard motion.allowsAmbient else { spinning = false; return }
+        let elapsed = Date.now.timeIntervalSince(spinStart)
+        let angle = restAngle + spun(elapsed)
+        let speed = spinSpeed(elapsed)
+        let rest = PieceMotion.project(angle, velocity: speed)
+        let friction = Spring(duration: PieceMotion.calm.duration, bounce: 0)
+        withAnimation(motion.settle(velocity: speed, from: angle, to: rest, spring: friction)) {
+            spinning = false
+            restAngle = rest
+        }
+    }
+
+    /// Degrees turned `t` seconds into a spin that starts from rest.
+    private func spun(_ t: TimeInterval) -> Double {
+        let t = max(t, 0)
+        return 360 * turnsPerSecond * (t - spinUp * (1 - exp(-t / spinUp)))
+    }
+
+    /// The spin's speed in degrees per second, `t` seconds in.
+    private func spinSpeed(_ t: TimeInterval) -> Double {
+        360 * turnsPerSecond * (1 - exp(-max(t, 0) / spinUp))
+    }
+
+    /// The still arc's opacity `t` seconds into loading under Reduce Motion: a slow breath between full and 0.45.
+    /// It starts at full, so loading begins without a jump.
+    private func breath(_ t: TimeInterval) -> Double {
+        0.725 + 0.275 * cos(2 * .pi * max(t, 0) / breathPeriod)
+    }
+
+    /// The block, filled inward from the outer edge: 0 is nothing, 1 a solid disc. Fill it even-odd.
+    private struct Flood: Shape {
+        var level: CGFloat
+
+        var animatableData: CGFloat {
+            get { level }
+            set { level = newValue }
+        }
+
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            guard level > 0 else { return path }
+            path.addEllipse(in: rect)
+            // The center closes by 80%, so it is shut before the mark starts and a spring's tail never leaves a speck.
+            let depth = min(level / 0.8, 1) * min(rect.width, rect.height) / 2
+            let hole = rect.insetBy(dx: depth, dy: depth)
+            if !hole.isEmpty { path.addEllipse(in: hole) }
+            return path
+        }
+    }
+
+    /// Check or cross, one path stroked to `progress` so the cross draws its lines in order. The line thins to nothing
+    /// over the first few percent, like a pen landing and lifting, so an un-drawn mark never leaves its round cap
+    /// behind while the spring settles.
+    private struct Mark: Shape {
+        var cross: Bool
+        var progress: CGFloat
+        var lineWidth: CGFloat
+
+        var animatableData: CGFloat {
+            get { progress }
+            set { progress = newValue }
+        }
+
+        func path(in rect: CGRect) -> Path {
+            let width = lineWidth * min(progress / 0.06, 1)
+            guard width > 0 else { return Path() }
+            return outline(in: rect)
+                .trimmedPath(from: 0, to: progress)
+                .strokedPath(StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+        }
+
+        private func outline(in rect: CGRect) -> Path {
+            var path = Path()
+            if cross {
+                path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+                path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            } else {
+                path.move(to: CGPoint(x: rect.minX, y: rect.midY + rect.height * 0.04))
+                path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.36, y: rect.maxY - rect.height * 0.1))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.12))
+            }
+            return path
+        }
+    }
+}
+
+// MARK: - Example
+
+/// The ring itself, with its caption: tap through a save that fails, a retry, and a save that lands.
+private struct StatusMorphExample: View {
+    @State private var step = 0
+    private let steps: [StatusMorph.State] = [.idle, .loading, .failure, .loading, .success]
+
+    var body: some View {
+        StatusMorph(state: steps[step], captions: .saving, size: 196, lineWidth: 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(StatusMorph.Style.adaptive(0xF3F2EE, 0x121212))
+            .onTapGesture { step = (step + 1) % steps.count }
+    }
+}
+
+#Preview("Light") {
+    StatusMorphExample()
+}
+
+#Preview("Dark") {
+    StatusMorphExample().preferredColorScheme(.dark)
+}
+
+#Preview("States") {
+    HStack(spacing: 28) {
+        StatusMorph(state: .idle, size: 56, lineWidth: 4)
+        StatusMorph(state: .loading, size: 56, lineWidth: 4)
+        StatusMorph(state: .success, size: 56, lineWidth: 4)
+        StatusMorph(state: .failure, size: 56, lineWidth: 4)
+    }
+    .padding()
+}
+
+// MARK: - Piece motion
+//
+// The SwiftPieces motion language: shared spring tokens and gesture physics, with the same values in every
+// piece. Each piece carries a copy of only the parts it uses, so this file stands alone. Generated from
+// registry/foundation/PieceMotion.swift in the SwiftPieces repo; edit it there, not here.
+// swiftpieces-motion: 1.1.0 (core, follow, momentum, pop, shake)
+
+/// The SwiftPieces motion language: five spring tiers, and a named role for every moment a piece moves,
+/// each with its Reduce Motion substitute.
+///
+/// Build one from the environment, `PieceMotion(reduceMotion: reduceMotion)`, and pick the role that names
+/// what just happened. Never animate the tracking of a finger: set gesture state directly in `onChanged`, so the
+/// surface stays under the finger, and spring only the release.
+private struct PieceMotion {
+    var reduceMotion = false
+
+    // Tiers. Overshoot and settle times are measured from rest with SwiftUI's Spring.
+    /// No overshoot, 90% in about 90ms. A press arriving under the finger.
+    static var tight: Spring { Spring(duration: 0.14, bounce: 0) }
+    /// About 2.8% overshoot, 90% in about 140ms. Snapping to a detent, page or segment.
+    static var responsive: Spring { Spring(duration: 0.32, bounce: 0.25) }
+    /// About 8.4% overshoot. Visible give: a release, a return from past an edge, a drag settling home.
+    static var elastic: Spring { Spring(duration: 0.42, bounce: 0.38) }
+    /// About 15% overshoot. A resolved action landing. At most once per interaction.
+    static var expressive: Spring { Spring(duration: 0.48, bounce: 0.48) }
+    /// About 1.5% overshoot, unhurried. Opening large surfaces and ambient change.
+    static var calm: Spring { Spring(duration: 0.5, bounce: 0.2) }
+
+    /// Reduce Motion: settles become this short spring with no overshoot.
+    private static var still: Animation { .spring(duration: 0.25, bounce: 0) }
+
+    // Roles.
+    /// Touch-down. Starts on the same frame and never bounces under the finger.
+    var press: Animation { .spring(Self.tight) }
+    /// The finger lifts off a pressed surface, which springs back through rest.
+    var release: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A dragged thing comes to rest. With a gesture's velocity, use `settle(velocity:from:to:)` instead.
+    var settle: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// Lands on a detent, page or segment.
+    var snap: Animation { reduceMotion ? Self.still : .spring(Self.responsive) }
+    /// A number, a chart value or anything else people read moves to its new value. Never overshoots, so it
+    /// never shows a value that isn't true.
+    var value: Animation { reduceMotion ? Self.still : .spring(duration: 0.35, bounce: 0) }
+    /// Comes back from past a limit: a pull beyond the edge, a value pushed against its bound.
+    var rebound: Animation { reduceMotion ? Self.still : .spring(Self.elastic) }
+    /// A shape or container changes size, corner radius or form, with a little give at the end.
+    var morph: Animation { reduceMotion ? Self.still : .spring(duration: 0.4, bounce: 0.2) }
+    /// Something appears, opens or expands. Opening is a little slower than closing.
+    var reveal: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.calm) }
+    /// Something leaves, closes or collapses. Quick and firm, out of the way.
+    var dismiss: Animation { reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.3, bounce: 0.08) }
+    /// A resolved action lands: a check, a sent state, a reaction.
+    var success: Animation { reduceMotion ? .easeOut(duration: 0.24) : .spring(Self.expressive) }
+    /// A refused action. Firm, no wobble; `pieceShake` adds the movement.
+    var error: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(Self.responsive) }
+    /// Slow ambient change. Loops themselves stop under Reduce Motion: check `allowsAmbient`.
+    var ambient: Animation { reduceMotion ? .easeInOut(duration: 0.3) : .spring(Self.calm) }
+
+    /// Loops, drifts, idle breathing and parallax run only when this is true.
+    var allowsAmbient: Bool { !reduceMotion }
+
+    /// A moving transition, or a plain fade under Reduce Motion.
+    func transition(_ transition: AnyTransition) -> AnyTransition {
+        reduceMotion ? .opacity : transition
+    }
+
+    /// For content replaced inside a container that stays put (a label, a glyph, a count): the old content
+    /// blurs out as the new one sharpens in. A fade under Reduce Motion.
+    @MainActor var swap: AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+}
+
+extension PieceMotion {
+    /// Follow-through: rank 0 leads, each later rank arrives a beat later on a slightly looser spring. Safe to reverse.
+    func follow(_ spring: Spring = PieceMotion.elastic, rank: Int) -> Animation {
+        guard !reduceMotion else { return .spring(duration: 0.25, bounce: 0) }
+        let k = Double(min(max(rank, 0), 6))
+        return .spring(duration: spring.duration + 0.04 * k, bounce: min(spring.bounce + 0.02 * k, 0.55))
+    }
+
+    /// One-shot entrances only: item `index` waits 30ms per place, capped at the seventh. Exits go together.
+    func cascade(_ animation: Animation, index: Int, step: Double = 0.03) -> Animation {
+        guard !reduceMotion, index > 0 else { return animation }
+        return animation.delay(step * Double(min(index, 7)))
+    }
+}
+
+extension PieceMotion {
+    /// Where a flick at `velocity` (pt/s) coasts to. 0.998 coasts like a scroll view; 0.99 suits detents.
+    nonisolated static func project(_ position: CGFloat, velocity: CGFloat, decelerationRate: CGFloat = 0.99) -> CGFloat {
+        position + velocity / 1000 * decelerationRate / (1 - decelerationRate)
+    }
+
+    /// The candidate closest to `value`.
+    nonisolated static func nearest(_ value: CGFloat, in candidates: [CGFloat]) -> CGFloat {
+        candidates.min { abs($0 - value) < abs($1 - value) } ?? value
+    }
+
+    /// A settle that leaves at the finger's speed (pt/s). One per axis, each on its own `.offset(x:)` / `.offset(y:)`:
+    /// a spring takes one velocity. SwiftUI's own velocity carry-over is unreliable; this always carries it.
+    func settle(velocity: CGFloat, from current: CGFloat, to target: CGFloat, spring: Spring = PieceMotion.elastic) -> Animation {
+        let spring = reduceMotion ? Spring(duration: 0.25, bounce: 0) : spring
+        let distance = target - current
+        guard abs(distance) >= 1 else { return .spring(spring) }
+        // In whole distances per second, capped near the spring's frequency: a hard flick adds give, not a slingshot.
+        // At exactly the frequency a critically damped spring cannot pass its target, so Reduce Motion stops there.
+        let cap = 2 * Double.pi / spring.duration * (reduceMotion ? 1 : 1.5)
+        let relative = min(max(Double(velocity / distance), -cap), cap)
+        return .interpolatingSpring(spring, initialVelocity: relative)
+    }
+}
+
+/// Anticipation, overshoot, settle: dips, swells past full size and lands each time `trigger` changes. Under
+/// Reduce Motion it stays still (same view, no identity change) and the color or symbol carries the meaning.
+private struct PiecePop: ViewModifier {
+    let trigger: AnyHashable
+    var amount: CGFloat = 0.08
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let amount = reduceMotion ? 0 : amount
+        content.keyframeAnimator(initialValue: CGFloat(1), trigger: trigger) { view, scale in
+            view.scaleEffect(scale)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(1 - amount * 0.4, duration: 0.08)
+                SpringKeyframe(1 + amount, duration: 0.14, spring: Spring(duration: 0.18, bounce: 0))
+                SpringKeyframe(1, duration: 0.42, spring: PieceMotion.expressive)
+            }
+        }
+    }
+}
+
+private extension View {
+    /// Pops each time `trigger` changes. Use a counter, never a Bool that can flip back before it fires.
+    func piecePop(trigger: some Hashable & Sendable, amount: CGFloat = 0.08) -> some View {
+        modifier(PiecePop(trigger: AnyHashable(trigger), amount: amount))
+    }
+}
+
+/// A short decaying side-to-side shake for refused input, each time `trigger` changes. Under Reduce Motion it stays
+/// still (same view, no identity change): pair it with a color or message change and the error haptic.
+private struct PieceShake: ViewModifier {
+    let trigger: AnyHashable
+    var distance: CGFloat = 8
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let distance = reduceMotion ? 0 : distance
+        content.keyframeAnimator(initialValue: CGFloat(0), trigger: trigger) { view, x in
+            view.offset(x: x)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(-distance, duration: 0.06)
+                CubicKeyframe(distance * 0.75, duration: 0.07)
+                CubicKeyframe(-distance * 0.5, duration: 0.07)
+                CubicKeyframe(distance * 0.25, duration: 0.06)
+                SpringKeyframe(0, duration: 0.12, spring: Spring(duration: 0.18, bounce: 0))
+            }
+        }
+    }
+}
+
+private extension View {
+    /// Shakes this view side to side once each time `trigger` changes, for input that was refused.
+    func pieceShake(trigger: some Hashable & Sendable, distance: CGFloat = 8) -> some View {
+        modifier(PieceShake(trigger: AnyHashable(trigger), distance: distance))
+    }
+}
+
+// swiftpieces-motion: end
+
+// MARK: - Piece liquid
+//
+// The SwiftPieces liquid glass language: glass shapes that merge through a neck, bubbles that bud out of
+// and melt back into each other, and the frosted fallback before iOS 26. Each piece carries a copy of only
+// the parts it uses, so this file stands alone. Generated from registry/foundation/PieceLiquid.swift in the
+// SwiftPieces repo; edit it there, not here. The rules are in LIQUID_GLASS.md.
+// swiftpieces-liquid: 1.8.0 (liquid, morphText)
+
+/// The liquid glass language: one merge distance, two rest gaps, and the springs a bubble leaves and comes home on.
+///
+/// Glass shapes inside one `PieceLiquidGroup` melt into each other through a neck when they come within `merge`
+/// points. Parts of one control rest `joined`, inside that distance, so the neck holds; separate actions rest
+/// `apart`, outside it, so they only goo while one buds out of, or melts back into, another.
+private enum PieceLiquid {
+    /// Glass shapes closer than this share a neck.
+    static let merge: CGFloat = 20
+    /// The gap between parts of one control (a stepper's buttons, a progress pill and its stop): the neck holds,
+    /// short and smooth, about two thirds of the shapes' height at its waist. Joined parts read best at one height.
+    static let joined: CGFloat = 4
+    /// The gap between separate actions (menu items, confirm and cancel, chips): they rest as their own bubbles.
+    static let apart: CGFloat = 26
+    /// How far a bubble shrinks while it is home inside its parent.
+    static let homeScale: CGFloat = 0.72
+
+    /// A bubble leaving its parent: slow enough that the neck's stretch and snap read.
+    static func split(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.62, bounce: 0.22)
+    }
+
+    /// A bubble going home. No bounce: a bounce would carry it out through the far side of its parent.
+    static func home(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeIn(duration: 0.18) : .spring(duration: 0.5, bounce: 0)
+    }
+}
+
+/// A group of glass shapes that merge into one liquid surface. On iOS 26 it is a `GlassEffectContainer`; before
+/// that, and under Reduce Transparency, the shapes draw on their own and simply don't merge. `lift` adds the soft
+/// shadow liquid glass floats on in light mode.
+private struct PieceLiquidGroup<Content: View>: View {
+    var spacing: CGFloat = PieceLiquid.merge
+    var lift = true
+    @ViewBuilder var content: Content
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        container
+            .shadow(color: .black.opacity(lift && colorScheme == .light ? 0.07 : 0), radius: 18, y: 8)
+    }
+
+    @ViewBuilder private var container: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+/// One liquid glass shape: Liquid Glass on iOS 26, carrying `tint` as a solid colour and swelling under a press when
+/// `interactive`; a frosted Material with a light rim and a soft shadow before that; a solid fill under Reduce
+/// Transparency.
+///
+/// The tint is painted inside clear glass rather than tinting the glass. Tinted glass in a group bleeds its colour
+/// through every neck as a smear, so a red button would glow into the white pill it is joined to; painted inside,
+/// the colour stays crisp to the shape's edge, the necks between shapes are clear glass, and a tint change animates
+/// like any colour (tinted glass snaps).
+private struct PieceLiquidSurface<S: Shape>: ViewModifier {
+    var shape: S
+    var tint: Color?
+    var interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.pieceLiquidScale) private var scale
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *), !reduceTransparency {
+            // Scaled as two parts, content and outline, about the same centre. A scaleEffect on a glass view inside a
+            // GlassEffectContainer shrinks the glass but leaves what it carries full size, pinned to its corner.
+            content
+                .background { shape.fill(tint ?? .clear) }
+                .scaleEffect(scale)
+                .glassEffect(glass, in: shape.scale(scale))
+        } else {
+            fallback(content).scaleEffect(scale)
+        }
+        #else
+        fallback(content).scaleEffect(scale)
+        #endif
+    }
+
+    #if compiler(>=6.2)
+    @available(iOS 26, *)
+    private var glass: Glass {
+        interactive ? Glass.regular.interactive() : .regular
+    }
+    #endif
+
+    private func fallback(_ content: Content) -> some View {
+        let dark = colorScheme == .dark
+        return content
+            .background {
+                if reduceTransparency {
+                    shape.fill(tint ?? (dark ? Color(white: 0.17) : Color(white: 0.97)))
+                } else {
+                    ZStack {
+                        shape.fill(.regularMaterial)
+                        if let tint { shape.fill(tint.opacity(0.88)) }
+                    }
+                }
+            }
+            .overlay { shape.stroke(Color.white.opacity(dark ? 0.14 : 0.7), lineWidth: 0.5) }
+            .shadow(color: .black.opacity(dark ? 0.32 : 0.08), radius: 10, y: 5)
+    }
+}
+
+private struct PieceLiquidScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1
+}
+
+private extension EnvironmentValues {
+    /// How much the liquid shapes below are scaled, about their own centres. Nested scales multiply.
+    var pieceLiquidScale: CGFloat {
+        get { self[PieceLiquidScaleKey.self] }
+        set { self[PieceLiquidScaleKey.self] = newValue }
+    }
+}
+
+private extension View {
+    /// Draws this view on a liquid glass `shape`. Put it inside a `PieceLiquidGroup` so it can merge with its neighbours.
+    func pieceLiquid<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(PieceLiquidSurface(shape: shape, tint: tint, interactive: interactive))
+    }
+
+    /// Scales the liquid glass shapes in this view, content and outline together, about their own centres. Use it
+    /// instead of `scaleEffect` on a glass view (a press, a lift, a swell): inside a group a plain `scaleEffect` shrinks
+    /// the glass but leaves its content full size and off centre. Animates like any other value.
+    func pieceLiquidScale(_ scale: CGFloat) -> some View {
+        transformEnvironment(\.pieceLiquidScale) { $0 *= scale }
+    }
+}
+
+/// A label that changes letter by letter: letters both strings share hold still, the rest blur out and the new ones
+/// blur in a few milliseconds apart. Under Reduce Motion it cross-fades. VoiceOver reads the whole string.
+///
+/// Only text whose letters stand on their own is cut into letters: Latin, Greek, Cyrillic, CJK, digits and symbols.
+/// Those letters are laid out left to right whatever the layout direction, the order they read in, so "1.5×" stays
+/// "1.5×" in an Arabic or Hebrew interface instead of coming out backwards. Text in a right-to-left script, or in one
+/// whose letters join or reorder (Arabic, Hebrew, Devanagari, Thai and their neighbours), can't be cut apart without
+/// breaking it, so it changes as one: the old string blurs out where it stood while the new one blurs in.
+private struct PieceMorphText: View {
+    var text: String
+    var font: Font = .body.weight(.semibold)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        // The morphing label at its full size when it fits. When it doesn't (a long label at an accessibility text
+        // size, a narrow screen), the same words wrap onto a second line and shrink a little instead of running past
+        // the screen's edge; that one changes as a whole rather than letter by letter. A single word never splits
+        // across lines: it stays on one and shrinks further.
+        let oneWord = !text.contains(where: \.isWhitespace)
+        ViewThatFits(in: .horizontal) {
+            morphing.fixedSize()
+            Text(text)
+                .lineLimit(oneWord ? 1 : 2)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(oneWord ? 0.5 : 0.75)
+                .fixedSize(horizontal: false, vertical: true)
+                .id(text)
+                .transition(transition(0, scale: 0.9))
+        }
+        .font(font)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+
+    @ViewBuilder private var morphing: some View {
+        if Self.splits(text) {
+            let glyphs = Array(text)
+            HStack(spacing: 0) {
+                ForEach(glyphs.indices, id: \.self) { i in
+                    Text(String(glyphs[i]))
+                        .id("\(i)\(glyphs[i])")
+                        .transition(transition(i, scale: 0.6))
+                }
+            }
+            // The letters' reading order, not the layout's: an HStack lays its children out backwards under a
+            // right-to-left layout.
+            .environment(\.layoutDirection, .leftToRight)
+        } else {
+            ZStack(alignment: .leading) {
+                Text(text)
+                    .id(text)
+                    .transition(transition(0, scale: 0.9))
+            }
+        }
+    }
+
+    private func transition(_ i: Int, scale: CGFloat) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return AnyTransition(.blurReplace(.downUp)).combined(with: .scale(scale: scale, anchor: .bottom))
+            .animation(.spring(duration: 0.42, bounce: 0.3).delay(Double(i) * 0.022))
+    }
+
+    /// Whether `text` can be cut into letters that each read left to right on their own: no right-to-left script, no
+    /// script that joins or reorders its letters, and no bidirectional control characters.
+    private static func splits(_ text: String) -> Bool {
+        !text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x0590...0x08FF, // Hebrew, Arabic, Syriac, Thaana, NKo, Samaritan, Mandaic
+                 0x0900...0x0DFF, // Devanagari to Sinhala
+                 0x0E00...0x0FFF, // Thai, Lao, Tibetan
+                 0x1000...0x109F, // Myanmar
+                 0x1780...0x17FF, // Khmer
+                 0xA8E0...0xA8FF, // Devanagari Extended
+                 0xFB1D...0xFDFF, // Hebrew and Arabic presentation forms
+                 0xFE70...0xFEFF, // Arabic presentation forms B
+                 0x200E...0x200F, 0x202A...0x202E, 0x2066...0x2069, // bidirectional marks, embeddings and isolates
+                 0x10800...0x10FFF, // historic right-to-left scripts
+                 0x1E800...0x1EFFF: // Adlam and other right-to-left scripts
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}
+
+// swiftpieces-liquid: end

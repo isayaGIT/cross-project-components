@@ -1,5 +1,7 @@
 current working on:
-Sheet-ConfigSheet
+AssetServer(很多改动要做!!)
+
+
 Scree-Chat
 Screen-Moments
 Screen-Dashboard
@@ -12,6 +14,11 @@ Screen-Dashboard
 ImgView
 MomentSingleMoment
 Animated/SlideDownDismiss
+
+NeedReview:
+Sheet-ConfigSheet
+
+
 
 finished:
 Avatar

@@ -100,6 +100,45 @@ final class MessageBubbleShapeTests: XCTestCase {
         XCTAssertTrue(path.contains(CGPoint(x: 50, y: 59)))
     }
 
+
+    func testNineSliceAdjustmentRoundTripsLegacyHexEncoding() {
+        let adjustment = BubbleNineSliceAdjustment(encoded: 0x012045)
+        XCTAssertNotNil(adjustment)
+        XCTAssertEqual(adjustment?.encoded, 0x012045)
+        XCTAssertEqual(adjustment?.scaleZ, .addDifference)
+        XCTAssertEqual(adjustment?.scaleY, .subtractDifference)
+        XCTAssertEqual(adjustment?.scaleX, .multiplyRatio)
+        XCTAssertEqual(adjustment?.positionY, .adjustImageScale)
+        XCTAssertEqual(adjustment?.positionX, .adjustImageScale)
+        XCTAssertEqual(adjustment?.encoded, 73_797)
+    }
+
+    func testNineSliceRejectsUnknownOperations() {
+        XCTAssertNil(BubbleNineSliceAdjustment(encoded: 0x067000))
+        XCTAssertNil(BubbleNineSliceAdjustment(encoded: 0x1_000000))
+    }
+
+    func testNineSliceOperationsUseDocumentedFormulas() {
+        XCTAssertEqual(BubbleNineSliceOperation.addDifference.apply(value: 10, difference: 4, ratio: 2, sourceDimension: 20), 14)
+        XCTAssertEqual(BubbleNineSliceOperation.subtractHalfDifference.apply(value: 10, difference: 4, ratio: 2, sourceDimension: 20), 8)
+        XCTAssertEqual(BubbleNineSliceOperation.multiplyRatio.apply(value: 10, difference: 4, ratio: 2, sourceDimension: 20), 20)
+        XCTAssertEqual(BubbleNineSliceOperation.adjustImageScale.apply(value: 100, difference: 20, ratio: 2, sourceDimension: 40), 150)
+        XCTAssertEqual(BubbleNineSliceOperation.adjustImageScale.apply(value: 100, difference: 20, ratio: 2, sourceDimension: 0), 100)
+    }
+
+    func testNineSliceGridKeepsCornerInsetsAndExpandsCenter() {
+        let grid = BubbleNineSliceGrid(
+            sourceSize: CGSize(width: 100, height: 60),
+            destinationSize: CGSize(width: 180, height: 100),
+            insets: .init(top: 12, leading: 16, bottom: 12, trailing: 16)
+        )
+        XCTAssertEqual(grid.rect(for: .topLeading), CGRect(x: 0, y: 0, width: 16, height: 12))
+        XCTAssertEqual(grid.rect(for: .topTrailing), CGRect(x: 164, y: 0, width: 16, height: 12))
+        XCTAssertEqual(grid.rect(for: .center), CGRect(x: 16, y: 12, width: 148, height: 76))
+        XCTAssertEqual(grid.rect(for: .bottomTrailing), CGRect(x: 164, y: 88, width: 16, height: 12))
+    }
+
+
     func testMutatingRadiusCannotMakeItNegative() {
         var shape = MessageBubbleShape(cornerRadius: 12)
         shape.cornerRadius = -8

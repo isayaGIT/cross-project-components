@@ -1,0 +1,26 @@
+用于创建一个html app, 在上面放资产与资产config, 然后用ios app或别的(不一定是什么) 与其通信,
+本地app上下载asset server让下载的资产, 本地可以删除asset server没有在本版本下载的资源(取决于本地,
+asset server不管本地的行为)
+一个app对应一个 asset server
+
+input:
+app version num or UUID
+output:
+asset list
+downloadable method
+
+asset server contains:
+1. html to view assets
+    img, gif, video, animations, 3d models, audios,  must all support view
+2. html button "import" to import an asset
+3. asset info edit in html:
+    edit(name, desc, in versions(version UUID) etc),
+    delete(from server, data must be cleared as well)
+4. 服务端不应该只是告诉 App “下载这张图片”，还需要提供明确的显示位置与资产之间的映射关系。
+    server需要一个列表,列出所有可以被控制显示的部分, 然后server可以在html中分配asset给它们
+
+
+支持这些类:
+StickerPack, Stickers(GIF动画, JSON参数, PNG/JPG/等图像格式)
+动态消息气泡 (GIF动画和JSON参数)
+全屏幕动画 (GIF动画和JSON参数)

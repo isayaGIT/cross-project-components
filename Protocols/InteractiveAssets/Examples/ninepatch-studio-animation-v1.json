@@ -1,0 +1,15 @@
+{
+  "format": "ninepatch-studio/animation-v1",
+  "sourceFileName": "bubble-source.png",
+  "sourceWidth": 320,
+  "sourceHeight": 180,
+  "frameCount": 2,
+  "totalDuration": 0.24,
+  "frames": [
+    {"fileName": "frame_0000.png", "duration": 0.12},
+    {"fileName": "frame_0001.png", "duration": 0.12}
+  ],
+  "stretchInsets": {"top": 24, "left": 24, "bottom": 24, "right": 24},
+  "contentInsets": {"top": 12, "left": 14, "bottom": 12, "right": 14},
+  "integrationNote": "Exported PNG frames. Resolve these names to local resources before rendering."
+}

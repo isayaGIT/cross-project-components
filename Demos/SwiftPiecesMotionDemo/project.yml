@@ -1,0 +1,54 @@
+name: SwiftPiecesMotionDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  SwiftPiecesMotionDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Cards/FlipCard.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Cards/ParallaxCard.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Text/TextReveal.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Feedback/StatusMorph.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Motion/DragToDismiss.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Lists/DepthCarousel.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Backgrounds/Silk.swift
+      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/MotionPlayground/Backgrounds/Silk.metal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.swiftpiecesmotiondemo
+        PRODUCT_NAME: SwiftPiecesMotionDemo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSMotionUsageDescription: "Moves the light across the silk as you tilt the device."
+        SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      testTargets:
+        - SwiftPiecesMotionDemoUITests
+  SwiftPiecesMotionDemoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: SwiftPiecesMotionDemo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.swiftpiecesmotiondemo.uitests
+        PRODUCT_NAME: SwiftPiecesMotionDemoUITests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+        TEST_TARGET_NAME: SwiftPiecesMotionDemo
+schemes:
+  SwiftPiecesMotionDemo:
+    build:
+      targets:
+        SwiftPiecesMotionDemo: all
+    test:
+      targets:
+        - SwiftPiecesMotionDemoUITests
+    run:
+      config: Debug

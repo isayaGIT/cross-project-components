@@ -17,6 +17,7 @@ private enum ShowcasePage: String, CaseIterable, Identifiable {
     case chat = "Chat"
     case notices = "Notices"
     case reaction = "Reaction"
+    case apiKeySheet = "API Key Sheet"
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ private enum ShowcasePage: String, CaseIterable, Identifiable {
         case .chat: "bubble.left.and.bubble.right.fill"
         case .notices: "bell.badge.fill"
         case .reaction: "heart.circle.fill"
+        case .apiKeySheet: "key.horizontal.fill"
         }
     }
 }
@@ -46,7 +48,7 @@ private struct ShowcaseConversation: Identifiable {
 }
 
 private struct ComponentShowcaseView: View {
-    @State private var selectedPage: ShowcasePage = .reaction
+    @State private var selectedPage: ShowcasePage = .apiKeySheet
     @State private var reactionLiked = false
     @State private var reactionSaved = false
     @State private var pressedCount = 0
@@ -97,6 +99,7 @@ private struct ComponentShowcaseView: View {
                         case .chat: chatPage
                         case .notices: noticesPage
                         case .reaction: reactionPage
+                        case .apiKeySheet: apiKeySheetPage
                         }
                     }
                     .transition(.opacity)
@@ -331,6 +334,50 @@ private struct ComponentShowcaseView: View {
             .frame(height: 290)
             .padding(.vertical, 12)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    @State private var isApiKeySheetPresented = true
+    @State private var selectedProviderMessage = "选择一个服务商，查看点击反馈。"
+
+    private var apiKeySheetPage: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeading("SheetLlmApiKeyConfigSheet", subtitle: "正在检查的真实组件。点击下方按钮重新打开系统 Sheet，检查高度、圆角、背景和列表布局。")
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Provider selection", systemImage: "rectangle.bottomhalf.inset.filled")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(selectedProviderMessage)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Button {
+                    isApiKeySheetPresented = true
+                } label: {
+                    Label("打开 API Key 配置 Sheet", systemImage: "arrow.up.right.square")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(16)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .sheet(isPresented: $isApiKeySheetPresented) {
+            SheetLlmApiKeyConfigSheet(
+                providers: [
+                    .init(id: "openai", title: "OpenAI", subtitle: "API Key 已配置", icon: Image(systemName: "sparkles"), status: .ready),
+                    .init(id: "anthropic", title: "Anthropic", subtitle: "尚未添加 API Key", icon: Image(systemName: "brain.head.profile"), status: .unavailable),
+                    .init(id: "google", title: "Google Gemini", subtitle: "连接验证中", icon: Image(systemName: "diamond.hex.fill"), status: .checking),
+                    .init(id: "custom", title: "自定义 Provider", subtitle: "请求失败，请检查配置", icon: Image(systemName: "network"), status: .error)
+                ],
+                onSelectProvider: { provider in
+                    selectedProviderMessage = "已点击：\(provider.title)（\(provider.id)）"
+                    isApiKeySheetPresented = false
+                }
+            )
+            .presentationDetents([.height(390), .medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
         }
     }
 

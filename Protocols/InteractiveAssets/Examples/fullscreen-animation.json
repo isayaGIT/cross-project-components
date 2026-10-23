@@ -1,0 +1,12 @@
+{
+  "protocolVersion": "1.0",
+  "id": "celebration.confetti",
+  "version": "2",
+  "renderer": "lottie",
+  "media": {"assetID": "celebration-confetti-animation", "role": "fullscreen-animation"},
+  "durationMs": 2400,
+  "loop": "once",
+  "trigger": "message-reaction",
+  "contentMode": "aspectFit",
+  "dismissible": true
+}

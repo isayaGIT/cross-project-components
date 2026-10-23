@@ -51,30 +51,30 @@ private struct AnimatedShowcase: View {
                     .padding(16)
                     .background(.background, in: RoundedRectangle(cornerRadius: 24))
 
-                    sectionHeader("02", title: "PopIn", subtitle: "Tap the image. It expands in place into a separate overlay.")
+                    sectionHeader("02", title: "PopIn", subtitle: "Tap the avatar. A complete contact card grows out of that exact spot.")
                     VStack(spacing: 16) {
                         Button { showPopIn = true } label: {
-                            GeometryReader { geometry in
-                                let imageHeight = geometry.size.height
-                                let imageWidth = min(geometry.size.width, imageHeight * (2.0 / 3.0))
-                                HStack(spacing: 0) {
-                                    Spacer(minLength: 0)
-                                    Image("PopInPhoto")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: imageWidth, height: imageHeight)
-                                        // Measure after centering so the source frame matches
-                                        // the visible image, not its uncentered GeometryReader origin.
-                                        .popInSource(id: "moment-pop-source")
-                                    Spacer(minLength: 0)
+                            HStack(spacing: 14) {
+                                Image("PopInPhoto")
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 68, height: 68)
+                                    .clipShape(Circle())
+                                    .popInSource(id: "moment-pop-source")
+                                    .opacity(showPopIn ? 0 : 1)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("Alex Morgan").font(.headline)
+                                    Text("Product designer · Berlin").font(.subheadline).foregroundStyle(.secondary)
+                                    Text("Tap to view contact card").font(.caption).foregroundStyle(.indigo)
                                 }
-                                .frame(width: geometry.size.width, height: imageHeight)
+                                Spacer(minLength: 0)
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
                             }
-                            .frame(height: 230)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.black)
-                            .clipShape(RoundedRectangle(cornerRadius: 22))
-                            .opacity(showPopIn ? 0 : 1)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 22))
                         }
                         .buttonStyle(.plain)
                         VStack(spacing: 14) {
@@ -142,17 +142,81 @@ private struct AnimatedShowcase: View {
                 .zIndex(200)
             }
         }
-        .popInTransition(isPresented: $showPopIn, id: "moment-pop-source", speed: popSpeed, destinationAspectRatio: 2.0 / 3.0) {
-            ZStack {
-                Color.black
-                Image("PopInPhoto")
-                    .resizable()
-                    .scaledToFill()
-                    // Preserve image proportions while filling the animated rectangle.
-                    // A changing rectangle crops during flight instead of stretching pixels.
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+        .popInTransition(
+            isPresented: $showPopIn,
+            id: "moment-pop-source",
+            speed: popSpeed,
+            // Use the full available width so the backdrop never forms grey side gutters.
+            destinationAspectRatio: nil,
+            sourceCornerRadius: 34,
+            destinationCornerRadius: 30,
+            backdropOpacity: 0.2,
+            backdropBlurOpacity: 0.42,
+            contentRevealStart: 0.18,
+            contentRevealEnd: 0.64
+        ) {
+            VStack(spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    Image("PopInPhoto")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 250)
+                        .clipped()
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                        Button { showPopIn = false } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(.black.opacity(0.38), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close contact card")
+                    }
+                    .padding(18)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Alex Morgan").font(.title2.bold())
+                        Text("Product Designer").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Text("Designing thoughtful digital experiences. Usually found sketching interfaces or exploring a new city.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        Label("Berlin", systemImage: "mappin.and.ellipse")
+                        Label("12 mutuals", systemImage: "person.2")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    HStack(spacing: 10) {
+                        Button {} label: {
+                            Label("Message", systemImage: "bubble.left.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button {} label: {
+                            Image(systemName: "phone.fill")
+                                .frame(width: 48, height: 42)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background)
             }
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         }
     }
 

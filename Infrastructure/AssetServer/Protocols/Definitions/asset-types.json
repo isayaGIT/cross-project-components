@@ -1,0 +1,10 @@
+{
+  "protocolVersion": "1.0",
+  "assetTypes": [
+    {"id": "display", "label": "展示图片", "description": "用于聊天背景、头像、启动页等展示位置。", "accepts": ["image/"]},
+    {"id": "sticker", "label": "贴纸素材", "description": "上传贴纸使用的图片、GIF 或动画资源。", "accepts": ["image/", "video/", "application/json"]},
+    {"id": "bubble", "label": "动态消息气泡", "description": "上传消息气泡使用的 GIF、图片或动画资源。", "accepts": ["image/", "video/", "application/json"]},
+    {"id": "fullscreen", "label": "全屏动画", "description": "上传全屏动画使用的媒体资源。", "accepts": ["image/", "video/", "application/json"]},
+    {"id": "general", "label": "其他资源", "description": "存放暂时不属于上述分类的文件。", "accepts": ["*"]}
+  ]
+}

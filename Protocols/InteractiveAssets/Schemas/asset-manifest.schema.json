@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cross-project-components.invalid/protocols/interactive-assets/1.0/asset-manifest.schema.json",
+  "title": "Interactive Asset Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "contentID", "contentType", "contentVersion", "files"],
+  "properties": {
+    "protocolVersion": {"const": "1.0"},
+    "contentID": {"type": "string", "minLength": 1},
+    "contentType": {"enum": ["sticker-library", "sticker-pack", "sticker", "animated-message-bubble", "fullscreen-animation"]},
+    "contentVersion": {"type": "string", "minLength": 1},
+    "minimumClientVersion": {"type": "string", "minLength": 1},
+    "metadataFileID": {"type": "string", "minLength": 1},
+    "files": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/file"}
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "fileName", "mediaType", "byteCount", "sha256"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "fileName": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$"},
+        "mediaType": {"type": "string", "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$"},
+        "byteCount": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "role": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cross-project-components.invalid/protocols/interactive-assets/1.0/sticker.schema.json",
+  "title": "Standalone Sticker Document", "type": "object", "additionalProperties": false,
+  "required": ["protocolVersion", "id", "media"],
+  "properties": {
+    "protocolVersion": {"const": "1.0"}, "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
+    "media": {"$ref": "#/$defs/assetReference"}, "thumbnail": {"$ref": "#/$defs/assetReference"},
+    "parameters": {"$ref": "#/$defs/assetReference"}
+  },
+  "$defs": {"assetReference": {"type": "object", "additionalProperties": false, "required": ["assetID"], "properties": {"assetID": {"type": "string", "minLength": 1}, "role": {"type": "string"}}}}
+}

@@ -18,3 +18,5 @@
 Demos/StickerKeyboardDemo/build/
 !/Demos/ComponentShowcase/
 !/Demos/ComponentShowcase/**
+!/Demos/SwiftPiecesMotionDemo/
+!/Demos/SwiftPiecesMotionDemo/**

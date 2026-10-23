@@ -1,0 +1,6 @@
+{
+  "protocolVersion": "1.0",
+  "id": "cat-wave",
+  "name": "Waving Cat",
+  "media": {"assetID": "cat-wave-gif", "role": "sticker-media"}
+}

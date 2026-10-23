@@ -1,41 +1,50 @@
 {
-  "pins": [
+  "pins" : [
     {
-      "identity": "networkimage",
-      "kind": "remoteSourceControl",
-      "location": "https://github.com/gonzalezreal/NetworkImage",
-      "state": {
-        "revision": "2849f5323265386e200484b0d0f896e73c3411b9",
-        "version": "6.0.1"
+      "identity" : "lottie-spm-ccab6996",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/airbnb/lottie-spm.git",
+      "state" : {
+        "revision" : "0aff16288f8dc1e3dab35cbf5cf45979673fd3df",
+        "version" : "4.6.1"
       }
     },
     {
-      "identity": "nuke",
-      "kind": "remoteSourceControl",
-      "location": "https://github.com/kean/Nuke.git",
-      "state": {
-        "revision": "30f7a7e72e0607d304fbf69c799474bd5fb6d1ce",
-        "version": "13.2.0"
+      "identity" : "networkimage-30fb7cbe",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gonzalezreal/NetworkImage",
+      "state" : {
+        "revision" : "2849f5323265386e200484b0d0f896e73c3411b9",
+        "version" : "6.0.1"
       }
     },
     {
-      "identity": "swift-cmark",
-      "kind": "remoteSourceControl",
-      "location": "https://github.com/swiftlang/swift-cmark",
-      "state": {
-        "revision": "08ddb528923cc1a6527e02b7a1aee9e516ca749a",
-        "version": "0.9.0"
+      "identity" : "nuke-78e5c0cd",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kean/Nuke.git",
+      "state" : {
+        "revision" : "30f7a7e72e0607d304fbf69c799474bd5fb6d1ce",
+        "version" : "13.2.0"
       }
     },
     {
-      "identity": "swift-markdown-ui",
-      "kind": "remoteSourceControl",
-      "location": "https://github.com/gonzalezreal/swift-markdown-ui",
-      "state": {
-        "revision": "5f613358148239d0292c0cef674a3c2314737f9e",
-        "version": "2.4.1"
+      "identity" : "swift-cmark-8e53c1c0",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-cmark",
+      "state" : {
+        "revision" : "08ddb528923cc1a6527e02b7a1aee9e516ca749a",
+        "version" : "0.9.0"
+      }
+    },
+    {
+      "identity" : "swift-markdown-ui-fc3eaf1f",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gonzalezreal/swift-markdown-ui",
+      "state" : {
+        "revision" : "5f613358148239d0292c0cef674a3c2314737f9e",
+        "version" : "2.4.1"
       }
     }
   ],
-  "version": 2
+  "version" : 2
 }

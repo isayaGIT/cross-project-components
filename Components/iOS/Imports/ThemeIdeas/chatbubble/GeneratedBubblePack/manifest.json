@@ -1,0 +1,64 @@
+{
+  "pack": "GeneratedBubblePack",
+  "note": "Original generated procedural assets; reference images preserved. Bubble GIFs are previews; animated WebP is preferred for alpha edges.",
+  "bubbles": [
+    {
+      "id": "01_cream_cloud",
+      "webp": "bubbles/01_cream_cloud.webp",
+      "gif_preview": "previews/01_cream_cloud.gif",
+      "poster": "previews/01_cream_cloud.png"
+    },
+    {
+      "id": "02_jelly_dream",
+      "webp": "bubbles/02_jelly_dream.webp",
+      "gif_preview": "previews/02_jelly_dream.gif",
+      "poster": "previews/02_jelly_dream.png"
+    },
+    {
+      "id": "03_strawberry_milk",
+      "webp": "bubbles/03_strawberry_milk.webp",
+      "gif_preview": "previews/03_strawberry_milk.gif",
+      "poster": "previews/03_strawberry_milk.png"
+    },
+    {
+      "id": "04_lavender_letter",
+      "webp": "bubbles/04_lavender_letter.webp",
+      "gif_preview": "previews/04_lavender_letter.gif",
+      "poster": "previews/04_lavender_letter.png"
+    },
+    {
+      "id": "05_pearl_ribbon",
+      "webp": "bubbles/05_pearl_ribbon.webp",
+      "gif_preview": "previews/05_pearl_ribbon.gif",
+      "poster": "previews/05_pearl_ribbon.png"
+    },
+    {
+      "id": "06_moonlight",
+      "webp": "bubbles/06_moonlight.webp",
+      "gif_preview": "previews/06_moonlight.gif",
+      "poster": "previews/06_moonlight.png"
+    }
+  ],
+  "stickers": [
+    {
+      "id": "sticker_cat_blink",
+      "webp": "stickers/sticker_cat_blink.webp",
+      "png": "stickers/sticker_cat_blink.png"
+    },
+    {
+      "id": "sticker_twinkle_star",
+      "webp": "stickers/sticker_twinkle_star.webp",
+      "png": "stickers/sticker_twinkle_star.png"
+    },
+    {
+      "id": "sticker_heart_bounce",
+      "webp": "stickers/sticker_heart_bounce.webp",
+      "png": "stickers/sticker_heart_bounce.png"
+    },
+    {
+      "id": "sticker_pearl_sparkle",
+      "webp": "stickers/sticker_pearl_sparkle.webp",
+      "png": "stickers/sticker_pearl_sparkle.png"
+    }
+  ]
+}

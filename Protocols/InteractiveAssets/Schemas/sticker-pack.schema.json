@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cross-project-components.invalid/protocols/interactive-assets/1.0/sticker-pack.schema.json",
+  "title": "Sticker Pack Document", "type": "object", "additionalProperties": false,
+  "required": ["protocolVersion", "id", "name", "version", "stickers"],
+  "properties": {
+    "protocolVersion": {"const": "1.0"}, "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1}, "shortDescription": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "cover": {"$ref": "#/$defs/assetReference"}, "version": {"type": "string", "minLength": 1},
+    "stickers": {"type": "array", "items": {"$ref": "#/$defs/sticker"}},
+    "publisher": {"type": "string"}, "authorNickname": {"type": "string"}, "authorID": {"type": "string"},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "assetReference": {"type": "object", "additionalProperties": false, "required": ["assetID"], "properties": {"assetID": {"type": "string", "minLength": 1}, "role": {"type": "string"}}},
+    "sticker": {"type": "object", "additionalProperties": false, "required": ["id", "media"], "properties": {
+      "id": {"type": "string", "minLength": 1}, "name": {"type": "string"},
+      "tags": {"type": "array", "items": {"type": "string"}}, "media": {"$ref": "#/$defs/assetReference"},
+      "thumbnail": {"$ref": "#/$defs/assetReference"}, "parameters": {"$ref": "#/$defs/assetReference"}
+    }}
+  }
+}

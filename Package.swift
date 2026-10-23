@@ -13,6 +13,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0"),
+        .package(url: "https://github.com/airbnb/lottie-spm.git", from: "4.5.0"),
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", .upToNextMinor(from: "2.4.1")),
         .package(path: "Components/iOS/Trivial/SheetConfig"),
         .package(path: "Shapes/LineDashed"),
@@ -28,9 +29,9 @@ let package = Package(
         ),
         .target(
             name: "CrossProjectComponentsIOS",
-            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), .product(name: "Animated", package: "Animated"), .product(name: "BottomSheet", package: "SheetConfig"), "StickerData", "ImgData", "BackgroundData"],
+            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "Lottie", package: "lottie-spm"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), .product(name: "Animated", package: "Animated"), .product(name: "BottomSheet", package: "SheetConfig"), "StickerData", "ImgData", "BackgroundData"],
             path: "Components/iOS",
-            exclude: ["Animated", "ContactCard/Package.swift", "ContactCard/README.md", "ContactCard/build.sh", "ContactCard/Tests", "ContactCard/Examples", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift", "Trivial/SheetConfig/Package.swift"],
+            exclude: ["Animated", "Card-ProfileCard/Package.swift", "Card-ProfileCard/README.md", "Card-ProfileCard/Tests", "ContactCard/Package.swift", "ContactCard/README.md", "ContactCard/build.sh", "ContactCard/Tests", "ContactCard/Examples", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift", "Trivial/SheetConfig/Package.swift"],
             resources: [.process("Resources")]
         ),
         .target(name: "StickerData", path: "Class/Sticker", exclude: ["README.md"]),
