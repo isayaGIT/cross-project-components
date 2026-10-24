@@ -38,7 +38,6 @@ Delete the `SheetCustom` source and remove `SheetCustomHeight`, `SheetCustomConf
 - **Theme Picker:** replace native `.sheet` with `BottomSheet`; preserve the existing navigation/list content and selection behavior. Map the existing medium/large intent to a sensible shared-component height, keeping explicit dismissal after selecting a theme or tapping Done.
 - **Apps panel:** replace native `.sheet` with `BottomSheet`; preserve `SheetApps` selection callback and current medium/large intent with an appropriate shared height.
 - **Sticker Search:** remove its direct `.bottomSheet` presentation/state adapter and host its existing search content inside `BottomSheet`; preserve the public `StickerSearchSheet(isPresented:configuration:onSearch:)` initializer and its current default 90% height, search history, pack selection, and callbacks.
-- **ComposeSection:** replace the direct `.bottomSheet` modifier with `BottomSheet`, preserving capsule selection, 62% default height, and clearing the active capsule when dismissed.
 - **ScreenChatDemo API-key settings example:** replace its native `.sheet` with `BottomSheet`, preserving provider list content and the selection callback.
 - **ComposeSection:** explicitly out of scope for this ScreenChatDemo-focused migration because it is not used by the active demo call graph. Leave the reusable component untouched; do not broaden this change to unrelated or uninstantiated components.
 
