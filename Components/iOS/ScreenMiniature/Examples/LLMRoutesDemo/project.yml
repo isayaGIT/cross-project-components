@@ -1,0 +1,30 @@
+name: LLMRoutesDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  ScreenMiniature:
+    path: ../..
+targets:
+  LLMRoutesDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.llmroutesdemo
+        PRODUCT_NAME: LLMRoutesDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: ScreenMiniature
+        product: ScreenMiniature
+schemes:
+  LLMRoutesDemo:
+    build:
+      targets:
+        LLMRoutesDemo: all
+    run:
+      config: Debug
