@@ -229,14 +229,13 @@ public enum CardGeneralPalette: String, CaseIterable, Identifiable {
         }
     }
     fileprivate var theme: Float { self == .pearl ? 1 : 0 }
-    fileprivate var primaryShadow: Color { .black.opacity(self == .pearl ? 0.12 : 0.55) }
-    fileprivate var secondaryShadow: Color { .black.opacity(self == .pearl ? 0.08 : 0.3) }
 }
 
 public struct CardGeneral<S: Shape, Content: View>: View {
     private let shape: S
     private let palette: CardGeneralPalette
     private let thickness: CGFloat
+    private let shadowIntensity: Double
     private let content: Content
     private let showsCenterHighlights: Bool
     private let centerHighlightOpacity: Double
@@ -251,6 +250,7 @@ public struct CardGeneral<S: Shape, Content: View>: View {
         shape: S,
         thickness: CGFloat = 6,
         palette: CardGeneralPalette = .pearl,
+        shadowIntensity: Double = 1,
         showsCenterHighlights: Bool = false,
         centerHighlightOpacity: Double = 0.7,
         centerHighlightShine: Float = 1,
@@ -262,6 +262,7 @@ public struct CardGeneral<S: Shape, Content: View>: View {
         self.shape = shape
         self.palette = palette
         self.thickness = max(1, thickness)
+        self.shadowIntensity = min(max(shadowIntensity, 0), 1)
         self.showsCenterHighlights = showsCenterHighlights
         self.centerHighlightOpacity = min(max(centerHighlightOpacity, 0), 1)
         self.centerHighlightShine = centerHighlightShine
@@ -297,8 +298,9 @@ public struct CardGeneral<S: Shape, Content: View>: View {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: palette.primaryShadow, radius: 22, x: 0, y: 22)
-            .shadow(color: palette.secondaryShadow, radius: 8, x: 0, y: 6)
+            // Shadow intensity is intentionally applied only to the two shadow passes.
+            .shadow(color: .black.opacity((palette == .pearl ? 0.12 : 0.55) * shadowIntensity), radius: 22, x: 0, y: 22)
+            .shadow(color: .black.opacity((palette == .pearl ? 0.08 : 0.30) * shadowIntensity), radius: 8, x: 0, y: 6)
             .contentShape(shape)
             .highPriorityGesture(DragGesture(minimumDistance: 0).onChanged { value in
                 touchPoint = value.location
@@ -312,6 +314,7 @@ public extension View {
         shape: S,
         thickness: CGFloat = 6,
         palette: CardGeneralPalette = .pearl,
+        shadowIntensity: Double = 1,
         showsCenterHighlights: Bool = false,
         centerHighlightOpacity: Double = 0.7,
         centerHighlightShine: Float = 1,
@@ -323,6 +326,7 @@ public extension View {
             shape: shape,
             thickness: thickness,
             palette: palette,
+            shadowIntensity: shadowIntensity,
             showsCenterHighlights: showsCenterHighlights,
             centerHighlightOpacity: centerHighlightOpacity,
             centerHighlightShine: centerHighlightShine,
