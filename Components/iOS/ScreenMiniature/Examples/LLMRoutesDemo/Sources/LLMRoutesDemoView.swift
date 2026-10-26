@@ -158,7 +158,9 @@ struct LLMRoutesDemoView: View {
                 }
             }
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(.container, edges: .all)
+        .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.light)
         .sheet(item: $editingTask) { task in
             providerPicker(for: task)

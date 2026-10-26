@@ -20,6 +20,7 @@ targets:
         SWIFT_VERSION: 5.0
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UIRequiresFullScreen: YES
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
     dependencies:
       - package: ScreenMiniature
         product: ScreenMiniature

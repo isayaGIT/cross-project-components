@@ -9,13 +9,17 @@
 /* Begin PBXBuildFile section */
 		8B0AB39BDA97B406009D1061 /* LLMRoutesDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A43FB0E7DAC5CB616F309B /* LLMRoutesDemoApp.swift */; };
 		AFEF74885A8750B485226476 /* ScreenMiniature in Frameworks */ = {isa = PBXBuildFile; productRef = E3E54CCFA6945A4FBAC4D4EF /* ScreenMiniature */; };
+		B8EA0A6BCB44CE7028CA1BAD /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7D8E49805900F5CB9B2A508B /* LaunchScreen.storyboard */; };
+		E384D62F05E582758C2DCE00 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6549CAADD3EADFF9C4B63E11 /* Assets.xcassets */; };
 		F4809C27FFC04D1AEE7E9502 /* LLMRoutesDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A315E89D7B27412F1295A300 /* LLMRoutesDemoView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		6549CAADD3EADFF9C4B63E11 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		67A43FB0E7DAC5CB616F309B /* LLMRoutesDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRoutesDemoApp.swift; sourceTree = "<group>"; };
 		738880D97064C1562FEC60E7 /* LLMRoutesDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LLMRoutesDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A315E89D7B27412F1295A300 /* LLMRoutesDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRoutesDemoView.swift; sourceTree = "<group>"; };
+		A61FDBACD08E3773E4ED5BD7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		B19EEA7A629A28D4EE03FC97 /* ScreenMiniature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScreenMiniature; path = ../..; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -34,8 +38,10 @@
 		7CA1ED8710277A86A76C32B2 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				6549CAADD3EADFF9C4B63E11 /* Assets.xcassets */,
 				67A43FB0E7DAC5CB616F309B /* LLMRoutesDemoApp.swift */,
 				A315E89D7B27412F1295A300 /* LLMRoutesDemoView.swift */,
+				7D8E49805900F5CB9B2A508B /* LaunchScreen.storyboard */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -73,6 +79,7 @@
 			buildConfigurationList = 386D9209D443F4DDA44F3414 /* Build configuration list for PBXNativeTarget "LLMRoutesDemo" */;
 			buildPhases = (
 				CC085B545C39C662CF3D8BF4 /* Sources */,
+				8260E0C144D718C86EB6FAD7 /* Resources */,
 				5B30F666A4BA62196F7F90B0 /* Frameworks */,
 			);
 			buildRules = (
@@ -120,6 +127,18 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		8260E0C144D718C86EB6FAD7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E384D62F05E582758C2DCE00 /* Assets.xcassets in Resources */,
+				B8EA0A6BCB44CE7028CA1BAD /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		CC085B545C39C662CF3D8BF4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -132,6 +151,17 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXVariantGroup section */
+		7D8E49805900F5CB9B2A508B /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A61FDBACD08E3773E4ED5BD7 /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		0BBB0DA6905C70AA99A5F9C9 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -139,6 +169,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -147,7 +179,7 @@
 				PRODUCT_NAME = LLMRoutesDemo;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -157,6 +189,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -165,7 +199,7 @@
 				PRODUCT_NAME = LLMRoutesDemo;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
