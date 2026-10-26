@@ -9,6 +9,7 @@ private struct CardGeneralPlayground: View {
     @State private var selectedPalette: CardGeneralPalette = .pearl
     @State private var darkCanvas = false
     @State private var useCircle = false
+    @State private var showContent = false
     private var canvas: Color { darkCanvas ? Color(red: 0.12, green: 0.13, blue: 0.16) : Color(red: 0.91, green: 0.92, blue: 0.94) }
 
     var body: some View {
@@ -18,6 +19,7 @@ private struct CardGeneralPlayground: View {
                 Spacer()
                 Toggle("深色画布", isOn: $darkCanvas).labelsHidden()
             }
+            Toggle("显示中心 Content", isOn: $showContent)
             Picker("形状", selection: $useCircle) {
                 Text("圆角矩形").tag(false)
                 Text("圆形").tag(true)
@@ -46,10 +48,17 @@ private struct CardGeneralPlayground: View {
     @ViewBuilder
     private var demoCard: some View {
         if useCircle {
-            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette) { centerArtwork }
+            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette) { cardContent }
         } else {
-            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette) { centerArtwork }
+            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette) { cardContent }
         }
+    }
+
+    private var cardContent: some View {
+        Group {
+            if showContent { centerArtwork } else { Color.clear }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var centerArtwork: some View {

@@ -219,7 +219,7 @@ public struct CardGeneral<S: Shape, Content: View>: View {
                     // Render the rim above caller content so its inner half cannot be
                     // covered by the face. The centered stroke mask leaves the face
                     // transparent and the Metal view bounds naturally trim the outer half.
-                    .mask { shape.stroke(lineWidth: thickness * 2) }
+                    .mask { shape.stroke(lineWidth: thickness * 0.7) }
                     .allowsHitTesting(false)
             }
             .shadow(color: palette.primaryShadow, radius: 22, x: 0, y: 22)
