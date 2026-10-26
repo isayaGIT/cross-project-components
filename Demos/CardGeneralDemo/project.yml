@@ -1,0 +1,31 @@
+name: CardGeneralDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  CrossProjectComponents:
+    path: ../..
+targets:
+  CardGeneralDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.cardgeneraldemo
+        PRODUCT_NAME: CardGeneralDemo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: CrossProjectComponents
+        product: CrossProjectComponentsIOS
+schemes:
+  CardGeneralDemo:
+    build:
+      targets:
+        CardGeneralDemo: all
+    run:
+      config: Debug
