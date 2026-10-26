@@ -10,9 +10,8 @@ private struct CardGeneralPlayground: View {
     @State private var darkCanvas = false
     @State private var useCircle = false
     @State private var showContent = true
-    @State private var showEmbeddedButton = true
-    @State private var showCenterHighlights = true
     @State private var highlightOpacity = 0.7
+    @State private var embeddedButtonTapCount = 0
     @State private var shadowIntensity = 1.0
     private var canvas: Color { darkCanvas ? Color(red: 0.12, green: 0.13, blue: 0.16) : Color(red: 0.91, green: 0.92, blue: 0.94) }
 
@@ -24,12 +23,6 @@ private struct CardGeneralPlayground: View {
                 Toggle("深色画布", isOn: $darkCanvas).labelsHidden()
             }
             Toggle("显示中心 Content", isOn: $showContent)
-            Toggle("显示 Content 内的立体按钮", isOn: $showEmbeddedButton)
-            Toggle("显示原版白色高光（中心）", isOn: $showCenterHighlights)
-            if showCenterHighlights {
-                HStack { Text("高光强度"); Slider(value: $highlightOpacity, in: 0...1); Text("\(Int(highlightOpacity * 100))%") }
-                    .font(.footnote)
-            }
             HStack { Text("阴影强度"); Slider(value: $shadowIntensity, in: 0...1); Text("\(Int(shadowIntensity * 100))%") }
                 .font(.footnote)
             Picker("形状", selection: $useCircle) {
@@ -49,7 +42,7 @@ private struct CardGeneralPlayground: View {
                 .frame(width: useCircle ? 280 : 320, height: 320)
                 .padding(.horizontal, 28)
             Spacer(minLength: 12)
-            Text("中心内容应完整透出；只保留沿形状的反射边缘与投影")
+            Text("按钮点击：\(embeddedButtonTapCount) 次")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .padding(24)
@@ -60,9 +53,9 @@ private struct CardGeneralPlayground: View {
     @ViewBuilder
     private var demoCard: some View {
         if useCircle {
-            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: showEmbeddedButton, embeddedButtonPressed: false) { cardContent }
+            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: true, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
         } else {
-            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: showEmbeddedButton, embeddedButtonPressed: false) { cardContent }
+            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: true, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
         }
     }
 
