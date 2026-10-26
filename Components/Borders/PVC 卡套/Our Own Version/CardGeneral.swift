@@ -159,16 +159,20 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float2 bq = abs(bp) - bHalf + br;
         float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
         float face = 1.0 - smoothstep(-1.5, 1.5, bd);
-        float rim = exp(-abs(bd) * 0.42) * (1.0 - face * 0.35);
         if (u.buttonPressed > 0.5) {
-            // Visible tactile state: depress the face, deepen the inner edge,
-            // and soften its reflection while the finger is held down.
+            // Pressed state: a broad diagonal contact reflection reinforces
+            // compression. The resting state intentionally has no painted line.
+            float pressedRim = exp(-abs(bd) * 0.24) * (1.0 - face * 0.2);
+            float2 lineAxis = normalize(float2(0.58, 0.82));
+            float2 lineNormal = float2(-lineAxis.y, lineAxis.x);
+            float lineDistance = dot(bp - float2(-2.0, 0.0), lineNormal);
+            float lineAlong = dot(bp - float2(-2.0, 0.0), lineAxis);
+            float contactLine = exp(-lineDistance * lineDistance / 20.0)
+                              * smoothstep(-35.0, -25.0, lineAlong)
+                              * (1.0 - smoothstep(24.0, 35.0, lineAlong)) * face;
             color *= 1.0 - face * 0.24;
-            color *= 1.0 - rim * 0.10;
-        } else {
-            // A restrained upper rim keeps the resting button visibly raised.
-            float upperRim = rim * smoothstep(-0.8, 1.8, bp.y);
-            color += u.tint * upperRim * 0.035;
+            color *= 1.0 - pressedRim * 0.15;
+            color += u.tint * contactLine * 0.22;
         }
     }
     color = min(color, 0.7) + 0.3 * (1.0 - exp(-max(color - 0.7, 0.0) / 0.3));
