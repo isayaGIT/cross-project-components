@@ -1,0 +1,26 @@
+name: PVCCardHolderDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents.archive
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  PVCCardHolderDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - CardGeneral.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.archive.pvccardholder
+        PRODUCT_NAME: PVCCardHolderDemo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SWIFT_VERSION: 5.0
+schemes:
+  PVCCardHolderDemo:
+    build:
+      targets:
+        PVCCardHolderDemo: all
+    run:
+      config: Debug
