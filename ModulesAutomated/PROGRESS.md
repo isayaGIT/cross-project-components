@@ -37,3 +37,7 @@ Automated implementation log. Each cycle should add at least one reusable Swift 
 - 20261023-124956: **StickerCatalogService** — complete — subsystem `StickerCatalogService` — 1 source files — 2 turns — files: StickerCatalogService/StickerCatalogModels.swift, StickerCatalogService/StickerCatalogPath.swift, StickerCatalogService/StickerCatalogService.swift, StickerCatalogService/README.md
 
 - 20261023-144124: **WebSearchService** — complete — subsystem `WebSearchService` — 2 source files — 2 turns — files: WebSearchService/README.md, WebSearchService/WebSearchService.swift
+
+- 20261024-161159: **LLMStreaming** — complete — subsystem `LLMStreaming` — 4 source files — 2 turns — files: LLMStreaming/LLMStreaming.swift, LLMStreaming/README.md
+
+- 20261024-220426: **LLMRouting** — complete — subsystem `LLMProviderConfiguration` — 5 source files — 2 turns — files: LLMRouting/CostAccounting.swift, LLMRouting/LLMRouting.swift, LLMRouting/README.md

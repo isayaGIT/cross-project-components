@@ -5,6 +5,9 @@
 # Local demos and tests
 /demos/
 /tests/
+!/Tests/
+!/Tests/CrossProjectComponentsTests/
+!/Tests/CrossProjectComponentsTests/DragCoreTests.swift
 
 # Keep the ImgThumbnail demo app in the component repository.
 !/Demos/
@@ -20,3 +23,13 @@ Demos/StickerKeyboardDemo/build/
 !/Demos/ComponentShowcase/**
 !/Demos/SwiftPiecesMotionDemo/
 !/Demos/SwiftPiecesMotionDemo/**
+
+# Local web-preview dependencies and generated automation runtime data
+**/node_modules/
+ModulesAutomated/logs/
+ModulesAutomated/.checkpoints/
+ModulesAutomated/__pycache__/
+ModulesAutomated/.cycle.lock
+
+# Finder metadata
+**/.DS_Store

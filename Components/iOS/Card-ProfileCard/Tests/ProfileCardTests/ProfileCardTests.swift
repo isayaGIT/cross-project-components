@@ -13,6 +13,8 @@ final class ProfileCardTests: XCTestCase {
         XCTAssertNil(profile.profileImage)
         XCTAssertNil(profile.profileBackgroundImage)
         XCTAssertNil(profile.cardBackgroundImage)
+        XCTAssertEqual(profile.status, .online)
+        XCTAssertTrue(profile.recentMoments.isEmpty)
     }
 
     func testStyleClampsInvalidDimensionsAndFontSizes() {

@@ -395,45 +395,6 @@
       "log": "logs/20261023-113539.log"
     },
     {
-      "module_name": "LLMRouting",
-      "candidate_name": "LLMRouting",
-      "source_paths": [
-        "cloud/llm/routing.py",
-        "cloud/llm/cost.py",
-        "cloud/llm/telemetry.py",
-        "cloud/llm/__init__.py",
-        "cloud/llm/providers.py"
-      ],
-      "status": "complete",
-      "summary": "Continues the existing LLMRouting subsystem and preserves its routing implementation while extending it into a reusable Swift responsibility cluster. Includes dependency-injected task routing, chat/moments/TTS slot fallbacks, masked-key diagnostics, model cost estimation, persistent usage telemetry, routing diagnostics, and a gateway compatibility façade. The design keeps HTTP transport, provider request execution, and Anthropic-specific request handling delegated to the existing LLMTransport, LLMGateway, and AnthropicMessages components rather than duplicating them. The current project was inspected read-only: the existing LLMRouting module contained LLMRouting.swift and README.md, and the adjacent gateway and transport public interfaces were reviewed. No tests, builds, or git operations were run.",
-      "next_steps": [],
-      "capabilities": [
-        "Resolves task keys while preserving the source behavior for has_ui_slot=false, provider ID/name matching, model overrides, and chat-slot fallback.",
-        "Supports chat configuration with provider/profile selection and the default deepseek profile.",
-        "Supports moments, comments, vision, selector, and private slots with per-slot profile/model overrides and chat fallback.",
-        "Supports TTS extract and annotate slots, nested configuration sections, legacy top-level configuration, and chat fallback.",
-        "Loads route JSON defensively and preserves unknown profile metadata through a Codable JSON value type.",
-        "Reports missing or visibly masked API keys without printing or embedding credential values in diagnostics.",
-        "Estimates cost using ordered, case-insensitive model substring pricing and source-compatible token coercion.",
-        "Records per-task and per-day token usage, cost, latency, success/failure counts, and cache statistics using an actor-isolated telemetry store.",
-        "Persists usage JSON atomically and tolerates absent or malformed prior usage data.",
-        "Exposes routing diagnostics without making HTTP requests.",
-        "Provides compatibility closures for existing gateway entry points without reimplementing LLMGateway or LLMTransport.",
-        "Documents source mapping, integration boundaries, dependency injection, telemetry schema, and operational limitations."
-      ],
-      "files": [
-        "LLMRouting/LLMRouting.swift",
-        "LLMRouting/CostAccounting.swift",
-        "LLMRouting/UsageTelemetry.swift",
-        "LLMRouting/LLMRoutingFacade.swift",
-        "LLMRouting/README.md"
-      ],
-      "last_updated": "20261023-120003",
-      "conversation_id": "6adadbcc-8984-83e9-9c71-f1b61f9d5f10",
-      "turns": 4,
-      "log": "logs/20261023-120003.log"
-    },
-    {
       "module_name": "KaomojiStore",
       "candidate_name": "KaomojiStore",
       "source_paths": [
@@ -530,6 +491,67 @@
       "conversation_id": "6adb019e-07bc-83ea-a855-9221b9f5ec7f",
       "turns": 2,
       "log": "logs/20261023-144124.log"
+    },
+    {
+      "module_name": "LLMStreaming",
+      "candidate_name": "LLMStreaming",
+      "source_paths": [
+        "cloud/llm/stream.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/__init__.py"
+      ],
+      "status": "complete",
+      "summary": "Implemented and read-back-verified a reusable native Swift LLM streaming subsystem. Uses Foundation, URLSession.AsyncBytes, async/await, typed errors, and incremental SSE processing without buffering the complete response. No tests, builds, or Git operations were run.",
+      "next_steps": [],
+      "capabilities": [
+        "Reuses existing LLMTransport URL normalization, authentication headers, API-key validation, and DeepSeek V4 model detection.",
+        "Supports configurable connection timeouts, retry counts, and linear backoff for connection failures and HTTP 5xx responses.",
+        "Preserves request payload fields while enabling streaming and defaulting stream_options.include_usage to true.",
+        "Parses SSE incrementally, including multiline data, heartbeat comments, UTF-8-safe line handling, and terminal [DONE] events.",
+        "Exposes typed content deltas, reasoning deltas, token usage, cache statistics, completion reasons, provider-specific events, and upstream errors.",
+        "Supports cancellation and asynchronous event consumption without buffering the entire response.",
+        "Documents integration with LLMGateway, LLMRouting, LLMTransport, and AnthropicMessages, including architectural boundaries and open-source research with license decisions."
+      ],
+      "files": [
+        "LLMStreaming/LLMStreaming.swift",
+        "LLMStreaming/README.md"
+      ],
+      "last_updated": "20261024-161159",
+      "conversation_id": "6adc6858-1b38-83ea-adf4-6b50a5909528",
+      "turns": 2,
+      "log": "logs/20261024-161159.log"
+    },
+    {
+      "module_name": "LLMRouting",
+      "candidate_name": "LLMProviderConfiguration",
+      "source_paths": [
+        "cloud/llm/routing.py",
+        "cloud/llm/cost.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py",
+        "cloud/llm/providers.py"
+      ],
+      "status": "complete",
+      "summary": "Audited the existing Swift subsystem against the supplied Python source and corrected concrete routing and numeric-coercion compatibility gaps. Updated the README with verified behavior, intentional differences, and official Apple Foundation documentation references. Existing module structure and unrelated files remain unchanged.",
+      "next_steps": [],
+      "capabilities": [
+        "Matches Python truthiness for missing and falsey has_ui_slot values, including empty task objects.",
+        "Preserves source-compatible extract and annotate TTS configuration precedence.",
+        "Prevents incorrectly typed provider or model fields in individual tasks from invalidating the entire route document.",
+        "Supports Python-style whitespace and digit-separator handling in token-cost estimation.",
+        "Documents compatibility changes, security considerations, upstream research, and dependency decisions.",
+        "Read-back-verified all three modified files."
+      ],
+      "files": [
+        "LLMRouting/CostAccounting.swift",
+        "LLMRouting/LLMRouting.swift",
+        "LLMRouting/README.md"
+      ],
+      "last_updated": "20261024-220426",
+      "conversation_id": "6adcbaf4-a04c-83e9-a49b-94d0c7baf41c",
+      "turns": 2,
+      "log": "logs/20261024-220426.log"
     }
   ],
   "cycles": [
@@ -1224,6 +1246,448 @@
         "cloud/services/save/private.py",
         "cloud/services/save/store.py",
         "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-155626",
+      "candidate": "ConversationPersistence",
+      "module": "ConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/story.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-161159",
+      "candidate": "LLMStreaming",
+      "module": "LLMStreaming",
+      "status": "complete",
+      "source_paths": [
+        "cloud/llm/stream.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/__init__.py"
+      ],
+      "files": [
+        "LLMStreaming/LLMStreaming.swift",
+        "LLMStreaming/README.md"
+      ],
+      "turns": 2
+    },
+    {
+      "time": "20261024-163435",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-165009",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-170557",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-172131",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-173723",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-175256",
+      "candidate": "ConversationPersistence",
+      "module": "ConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/story.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-180836",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-182415",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-184007",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-185546",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-191128",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-192716",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-194304",
+      "candidate": "ConversationPersistence",
+      "module": "ConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/story.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-195847",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-201428",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-203008",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-204546",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-210127",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-211714",
+      "candidate": "ConversationPersistence",
+      "module": "ConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/story.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-213300",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/__init__.py",
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-214845",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/__init__.py",
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-220426",
+      "candidate": "LLMProviderConfiguration",
+      "module": "LLMRouting",
+      "status": "complete",
+      "source_paths": [
+        "cloud/llm/routing.py",
+        "cloud/llm/cost.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/__init__.py",
+        "cloud/llm/providers.py"
+      ],
+      "files": [
+        "LLMRouting/CostAccounting.swift",
+        "LLMRouting/LLMRouting.swift",
+        "LLMRouting/README.md"
+      ],
+      "turns": 2
+    },
+    {
+      "time": "20261024-222814",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/__init__.py",
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-224400",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-225939",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/__init__.py",
+        "cloud/llm/anthropic.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/transport.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/telemetry.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-231521",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-233101",
+      "candidate": "PrivateConversationPersistence",
+      "module": "PrivateConversationPersistence",
+      "status": "failed",
+      "source_paths": [
+        "cloud/services/save/__init__.py",
+        "cloud/services/save/flags.py",
+        "cloud/services/save/private.py",
+        "cloud/services/save/store.py",
+        "cloud/services/save/types.py"
+      ],
+      "turns": 1
+    },
+    {
+      "time": "20261024-234645",
+      "candidate": "LLMProviderResilience",
+      "module": "LLMProviderResilience",
+      "status": "failed",
+      "source_paths": [
+        "cloud/llm/__init__.py",
+        "cloud/llm/anthropic.py",
+        "cloud/llm/gateway.py",
+        "cloud/llm/stream.py",
+        "cloud/llm/telemetry.py",
+        "cloud/llm/transport.py"
       ],
       "turns": 1
     }

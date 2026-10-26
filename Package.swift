@@ -15,7 +15,7 @@ let package = Package(
         .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0"),
         .package(url: "https://github.com/airbnb/lottie-spm.git", from: "4.5.0"),
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", .upToNextMinor(from: "2.4.1")),
-        .package(path: "Components/iOS/Trivial/SheetConfig"),
+        .package(path: "Components/iOS/Trivial/BottomSheet"),
         .package(path: "Shapes/LineDashed"),
         .package(path: "Textures/LiquidGlass"),
         .package(path: "Components/iOS/Animated")
@@ -25,20 +25,21 @@ let package = Package(
             name: "CrossProjectComponents",
             dependencies: [.product(name: "MarkdownUI", package: "swift-markdown-ui"), .product(name: "LineDashed", package: "LineDashed")],
             path: "Components/macOS",
-            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif"]
+            exclude: ["TreeView/API.md", "TreeView/demo.gif", "FilmstripScrubber/demo.gif", "Canvas/CanvasNode/README.md", "Canvas/CanvasNode/readme-canvasNode.md", "Canvas/CanvasNodeButtons/readme-canvasNodeButtons.md", "Canvas/readme-canvas.md"]
         ),
         .target(
             name: "CrossProjectComponentsIOS",
-            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "Lottie", package: "lottie-spm"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), .product(name: "Animated", package: "Animated"), .product(name: "BottomSheet", package: "SheetConfig"), "StickerData", "ImgData", "BackgroundData"],
+            dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "Lottie", package: "lottie-spm"), .product(name: "LineDashed", package: "LineDashed"), .product(name: "LiquidGlassKit", package: "LiquidGlass", condition: .when(platforms: [.iOS])), .product(name: "Animated", package: "Animated"), .product(name: "BottomSheet", package: "BottomSheet"), "StickerData", "ImgData", "BackgroundData"],
             path: "Components/iOS",
-            exclude: ["Animated", "Card-ProfileCard/Package.swift", "Card-ProfileCard/README.md", "Card-ProfileCard/Tests", "ContactCard/Package.swift", "ContactCard/README.md", "ContactCard/build.sh", "ContactCard/Tests", "ContactCard/Examples", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/LiquidBlobBar/Demo", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift", "Trivial/SheetConfig/Package.swift"],
-            resources: [.process("Resources")]
+            exclude: ["Animated", "Card-ProfileCard/Package.swift", "Card-ProfileCard/README.md", "Card-ProfileCard/Tests", "ContactCard/Package.swift", "ContactCard/README.md", "ContactCard/build.sh", "ContactCard/Tests", "ContactCard/Examples", "SwipeBack/README.md", "Avatar/Package.swift", "Avatar/README.md", "Avatar/build.sh", "Avatar/Examples", "InputBar/README.md", "ImgPolaroid/Package.swift", "ImgPolaroid/README.md", "ImgPolaroid/Examples", "ImgPolaroid/Tests", "ImgView/Package.swift", "ImgView/README.md", "ImgView/Examples", "ImgView/Tests", "MessageBubble/README.md", "VoiceMessage/README.md", "MomentSingleMoment/README.md", "MomentSingleMoment/Examples", "Trivial/LiquidBlobBar/Demo", "Trivial/StickerKeyboard/README.md", "Trivial/StickerKeyboard/Package.swift", "InputContainer/SubComponents/StickerKeyboard/Package.swift", "ScreenChatContainer/ScreenChat/InputContainer/StickerKeyboard/Package.swift", "Trivial/BottomSheet/Package.swift", "Trivial/BottomSheet/Sources"],
+            resources: [.process("Resources"), .copy("Trivial/LiquidBlobBar/Resources/LiquidBlobBar-device.metallib"), .copy("Trivial/LiquidBlobBar/Resources/LiquidBlobBar-simulator.metallib")]
         ),
         .target(name: "StickerData", path: "Class/Sticker", exclude: ["README.md"]),
         .target(name: "ImgData", path: "Class/Img", exclude: ["README.md"]),
         .target(name: "BackgroundData", path: "Class/Background"),
         .testTarget(name: "ImgDataTests", dependencies: ["ImgData"], path: "Tests/ImgDataTests"),
         .testTarget(name: "StickerDataTests", dependencies: ["StickerData"], path: "Tests/StickerDataTests"),
-        .testTarget(name: "CrossProjectComponentsIOSTests", dependencies: ["CrossProjectComponentsIOS"], path: "Tests/CrossProjectComponentsIOSTests")
+        .testTarget(name: "CrossProjectComponentsIOSTests", dependencies: ["CrossProjectComponentsIOS"], path: "Tests/CrossProjectComponentsIOSTests"),
+        .testTarget(name: "CrossProjectComponentsTests", dependencies: ["CrossProjectComponents"], path: "Tests/CrossProjectComponentsTests")
     ]
 )

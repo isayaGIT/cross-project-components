@@ -7,22 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		23B6A623CD3F38B58051FAAE /* SwiftPiecesFollowScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF55C7412E1903707AF5AA6 /* SwiftPiecesFollowScroll.swift */; };
+		136B8F436643D2234A56ACA8 /* ConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA0A6F3BE116D83AE56C292 /* ConfigSheet.swift */; };
+		2081554E666C53C32E8E3C5F /* ListNodeLlmProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5509B9C16B9EB37A6AD1117F /* ListNodeLlmProviders.swift */; };
 		3C68F554CC0AF7C1E604CB29 /* Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7ACE0B392E3CEB4B2AD4BB7 /* Background.swift */; };
+		3F3C670A8106FF2DAA171708 /* FollowScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B8E1242397B248041FB467 /* FollowScroll.swift */; };
+		4533D07806C9860F573CE57A /* OpenShadersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D6FD7550BE91B0A3CFE1E5 /* OpenShadersView.swift */; };
 		475CB3C029971294BBA81E1A /* SwipeActionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AF8BBB990B4708AAA76C71D /* SwipeActionRow.swift */; };
 		62589A31BF8CC788D2D1AE0C /* NoticeStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50917388668A4C1997DFE84 /* NoticeStack.swift */; };
 		6A34F2872B5674B05F46C88C /* MessageListNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8AAA61C77576D7C802D3727 /* MessageListNode.swift */; };
+		753843F677D629EEE886912D /* SheetLlmApiKeyConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2ADCD42E0D40D5A530D8855 /* SheetLlmApiKeyConfigSheet.swift */; };
 		84271AF7F058F9D7E7641926 /* ReactionToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538DAD0A176EC39A54802655 /* ReactionToggle.swift */; };
 		8F23C9B559AD31CAE4FF4F3E /* ComponentShowcaseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71293F35C396347B3FF35C7B /* ComponentShowcaseApp.swift */; };
 		9DBE86D478738579496674B3 /* Avatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8808B98CCFB1E912621D061 /* Avatar.swift */; };
 		AD80A93376632EA1856B9BB8 /* WaveformScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE961708D83BC9CDE7AA3D2A /* WaveformScrub.swift */; };
 		AE5E660F32C307B8D68D71D8 /* ColorCustom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934739DA2483C29177FC6D90 /* ColorCustom.swift */; };
-		B4BB851BBFA871281E3A8FCD /* voice-sample.m4a in Resources */ = {isa = PBXBuildFile; fileRef = C7624C9981A27DEC7ADA70BA /* voice-sample.m4a */; };
+		B7E68BCAB46B9E893C8437B9 /* ReflectiveCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D1F20CAEE3C56A2056E022 /* ReflectiveCard.swift */; };
 		C9052638361E0B0339CA5D36 /* UnreadBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77B8AD04B01C1FDFC7960C16 /* UnreadBadge.swift */; };
 		C9535DA5FA9094D50DDD344E /* VoiceMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0DC9D76E77BA6D7FBA6637 /* VoiceMessage.swift */; };
+		CA8E1D80C076D74ACE6F785A /* ListApiConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D9B05A9D1F33359E89E754A /* ListApiConfig.swift */; };
 		D46386BB256BA46731E9B7AE /* Animated in Frameworks */ = {isa = PBXBuildFile; productRef = 7BCA40F03CDB9B26DB163A44 /* Animated */; };
 		D5618D9384ABEA2D25F9F976 /* SwiftPiecesElasticButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2580FC25D7FD19CD5A63CA02 /* SwiftPiecesElasticButton.swift */; };
-		D75E046C1C94672C7CD00038 /* FollowScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C79F8A6DA6FA8A00FF8F24 /* FollowScrollView.swift */; };
+		DF81FA3B939ED1DC32EE7B97 /* LiquidGlassKit in Frameworks */ = {isa = PBXBuildFile; productRef = BC9545619100EA255484DA40 /* LiquidGlassKit */; };
 		F5B0C8BFF30FBBB1E3F7BB93 /* SwiftPiecesSwipeActionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52075452A45FFC7D58C8DCAD /* SwiftPiecesSwipeActionRow.swift */; };
 		FC75F611A360D95028B2B729 /* SwiftPiecesNoticeStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41390D795E7F4C5D101BFD34 /* SwiftPiecesNoticeStack.swift */; };
 /* End PBXBuildFile section */
@@ -30,11 +35,14 @@
 /* Begin PBXFileReference section */
 		2580FC25D7FD19CD5A63CA02 /* SwiftPiecesElasticButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPiecesElasticButton.swift; sourceTree = "<group>"; };
 		41390D795E7F4C5D101BFD34 /* SwiftPiecesNoticeStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPiecesNoticeStack.swift; sourceTree = "<group>"; };
+		46B8E1242397B248041FB467 /* FollowScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowScroll.swift; sourceTree = "<group>"; };
 		4AF8BBB990B4708AAA76C71D /* SwipeActionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionRow.swift; sourceTree = "<group>"; };
+		4D9B05A9D1F33359E89E754A /* ListApiConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListApiConfig.swift; sourceTree = "<group>"; };
+		50D6FD7550BE91B0A3CFE1E5 /* OpenShadersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenShadersView.swift; sourceTree = "<group>"; };
 		52075452A45FFC7D58C8DCAD /* SwiftPiecesSwipeActionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPiecesSwipeActionRow.swift; sourceTree = "<group>"; };
+		52D1F20CAEE3C56A2056E022 /* ReflectiveCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectiveCard.swift; sourceTree = "<group>"; };
 		538DAD0A176EC39A54802655 /* ReactionToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionToggle.swift; sourceTree = "<group>"; };
-		5CF55C7412E1903707AF5AA6 /* SwiftPiecesFollowScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPiecesFollowScroll.swift; sourceTree = "<group>"; };
-		65C79F8A6DA6FA8A00FF8F24 /* FollowScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowScrollView.swift; sourceTree = "<group>"; };
+		5509B9C16B9EB37A6AD1117F /* ListNodeLlmProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListNodeLlmProviders.swift; sourceTree = "<group>"; };
 		71293F35C396347B3FF35C7B /* ComponentShowcaseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentShowcaseApp.swift; sourceTree = "<group>"; };
 		77B8AD04B01C1FDFC7960C16 /* UnreadBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnreadBadge.swift; sourceTree = "<group>"; };
 		7E0DC9D76E77BA6D7FBA6637 /* VoiceMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceMessage.swift; sourceTree = "<group>"; };
@@ -43,10 +51,12 @@
 		A8239E5A801F04DAC8072B47 /* ComponentShowcase.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ComponentShowcase.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A8808B98CCFB1E912621D061 /* Avatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Avatar.swift; sourceTree = "<group>"; };
 		AE961708D83BC9CDE7AA3D2A /* WaveformScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformScrub.swift; sourceTree = "<group>"; };
-		C7624C9981A27DEC7ADA70BA /* voice-sample.m4a */ = {isa = PBXFileReference; path = "voice-sample.m4a"; sourceTree = "<group>"; };
+		B2ADCD42E0D40D5A530D8855 /* SheetLlmApiKeyConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetLlmApiKeyConfigSheet.swift; sourceTree = "<group>"; };
 		C8A66E9E1ED497C69F3FD3E6 /* Animated */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Animated; path = ../../Components/iOS/Animated; sourceTree = SOURCE_ROOT; };
+		D5F5B07353A0432C830DB19E /* LiquidGlass */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LiquidGlass; path = ../../Textures/LiquidGlass; sourceTree = SOURCE_ROOT; };
 		E7ACE0B392E3CEB4B2AD4BB7 /* Background.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Background.swift; sourceTree = "<group>"; };
 		E8AAA61C77576D7C802D3727 /* MessageListNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageListNode.swift; sourceTree = "<group>"; };
+		FDA0A6F3BE116D83AE56C292 /* ConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,19 +65,64 @@
 			buildActionMask = 2147483647;
 			files = (
 				D46386BB256BA46731E9B7AE /* Animated in Frameworks */,
+				DF81FA3B939ED1DC32EE7B97 /* LiquidGlassKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0F93DA7E6521B3727534E79B /* FollowScroll */ = {
+			isa = PBXGroup;
+			children = (
+				46B8E1242397B248041FB467 /* FollowScroll.swift */,
+			);
+			name = FollowScroll;
+			path = ../../Components/iOS/Trivial/FollowScroll;
+			sourceTree = "<group>";
+		};
+		1234352E1D1B13390C75CE52 /* Sheet-LlmApiKeyConfigSheet */ = {
+			isa = PBXGroup;
+			children = (
+				B2ADCD42E0D40D5A530D8855 /* SheetLlmApiKeyConfigSheet.swift */,
+			);
+			name = "Sheet-LlmApiKeyConfigSheet";
+			path = "../../Components/iOS/Integrated/Sheet-LlmApiKeyConfigSheet";
+			sourceTree = "<group>";
+		};
 		2A29EC4B4A76EBEB8619CF24 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
 				71293F35C396347B3FF35C7B /* ComponentShowcaseApp.swift */,
-				B9E3B3606708CBC82442E0A4 /* Resources */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		2B70805AF09016CAA8785982 /* ListApiConfig */ = {
+			isa = PBXGroup;
+			children = (
+				4D9B05A9D1F33359E89E754A /* ListApiConfig.swift */,
+			);
+			name = ListApiConfig;
+			path = ../../Components/iOS/Trivial/ListApiConfig;
+			sourceTree = "<group>";
+		};
+		30F5D922F94608A95C9B58FB /* ReflectiveCard */ = {
+			isa = PBXGroup;
+			children = (
+				52D1F20CAEE3C56A2056E022 /* ReflectiveCard.swift */,
+			);
+			name = ReflectiveCard;
+			path = ../../Components/iOS/Imports/ReflectiveCard;
+			sourceTree = "<group>";
+		};
+		4C4E45825454539B4DE602FA /* ListNode-LlmProviders */ = {
+			isa = PBXGroup;
+			children = (
+				5509B9C16B9EB37A6AD1117F /* ListNodeLlmProviders.swift */,
+			);
+			name = "ListNode-LlmProviders";
+			path = "../../Components/iOS/Trivial/ListNode-LlmProviders";
 			sourceTree = "<group>";
 		};
 		5C38EAC040B4F05D4D80D1C7 /* Background */ = {
@@ -104,14 +159,21 @@
 				EBC82636A98F6EC10B85C105 /* Avatar */,
 				5C38EAC040B4F05D4D80D1C7 /* Background */,
 				6021628DFFCD502EBEA652AA /* Controls */,
+				0F93DA7E6521B3727534E79B /* FollowScroll */,
 				D62802D90C1163BF2F22420A /* iOS */,
+				2B70805AF09016CAA8785982 /* ListApiConfig */,
+				4C4E45825454539B4DE602FA /* ListNode-LlmProviders */,
 				A7FB5C8E61ED0D78C9E26E97 /* Lists */,
 				CB83B60595046536169FF922 /* MessageListNode */,
 				F62B9C482034E51F94DA86B8 /* NoticeStack */,
 				AC891880E598780BC306B594 /* Packages */,
 				D89D320989DE9C0018FFBBDB /* ReactionToggle */,
+				30F5D922F94608A95C9B58FB /* ReflectiveCard */,
+				B9270325062E37576A07A471 /* Sheet-ConfigSheet */,
+				1234352E1D1B13390C75CE52 /* Sheet-LlmApiKeyConfigSheet */,
 				92967A0DDEF67BE233DC6949 /* Sheets */,
 				2A29EC4B4A76EBEB8619CF24 /* Sources */,
+				E6805DE7B734F00E154E20A0 /* SwiftUI */,
 				8BC755ED62B4044B481A78D6 /* UnreadBadge */,
 				EE3F337CC1F2372A2C35B7BC /* VoiceMessage */,
 				BE6B8E68ED3BA55D1E86D26D /* Products */,
@@ -130,7 +192,6 @@
 		A7FB5C8E61ED0D78C9E26E97 /* Lists */ = {
 			isa = PBXGroup;
 			children = (
-				5CF55C7412E1903707AF5AA6 /* SwiftPiecesFollowScroll.swift */,
 				52075452A45FFC7D58C8DCAD /* SwiftPiecesSwipeActionRow.swift */,
 			);
 			name = Lists;
@@ -141,16 +202,18 @@
 			isa = PBXGroup;
 			children = (
 				C8A66E9E1ED497C69F3FD3E6 /* Animated */,
+				D5F5B07353A0432C830DB19E /* LiquidGlass */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
 		};
-		B9E3B3606708CBC82442E0A4 /* Resources */ = {
+		B9270325062E37576A07A471 /* Sheet-ConfigSheet */ = {
 			isa = PBXGroup;
 			children = (
-				C7624C9981A27DEC7ADA70BA /* voice-sample.m4a */,
+				FDA0A6F3BE116D83AE56C292 /* ConfigSheet.swift */,
 			);
-			path = Resources;
+			name = "Sheet-ConfigSheet";
+			path = "../../Components/iOS/Trivial/Sheet-ConfigSheet";
 			sourceTree = "<group>";
 		};
 		BE6B8E68ED3BA55D1E86D26D /* Products */ = {
@@ -173,7 +236,6 @@
 		D62802D90C1163BF2F22420A /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				65C79F8A6DA6FA8A00FF8F24 /* FollowScrollView.swift */,
 				4AF8BBB990B4708AAA76C71D /* SwipeActionRow.swift */,
 			);
 			name = iOS;
@@ -187,6 +249,15 @@
 			);
 			name = ReactionToggle;
 			path = ../../Components/iOS/Imports/SwiftPiecesOriginals/Feedback/ReactionToggle;
+			sourceTree = "<group>";
+		};
+		E6805DE7B734F00E154E20A0 /* SwiftUI */ = {
+			isa = PBXGroup;
+			children = (
+				50D6FD7550BE91B0A3CFE1E5 /* OpenShadersView.swift */,
+			);
+			name = SwiftUI;
+			path = ../../Components/iOS/Imports/OpenShaders/SwiftUI;
 			sourceTree = "<group>";
 		};
 		EBC82636A98F6EC10B85C105 /* Avatar */ = {
@@ -225,7 +296,6 @@
 			buildConfigurationList = 7508811D19AC85E7FC71E3B1 /* Build configuration list for PBXNativeTarget "ComponentShowcase" */;
 			buildPhases = (
 				9B638E069E26633FE37ED5EF /* Sources */,
-				DA777F146C39D749BF2CB41D /* Resources */,
 				711B3441E13AA454953F76C5 /* Frameworks */,
 			);
 			buildRules = (
@@ -235,6 +305,7 @@
 			name = ComponentShowcase;
 			packageProductDependencies = (
 				7BCA40F03CDB9B26DB163A44 /* Animated */,
+				BC9545619100EA255484DA40 /* LiquidGlassKit */,
 			);
 			productName = ComponentShowcase;
 			productReference = A8239E5A801F04DAC8072B47 /* ComponentShowcase.app */;
@@ -262,6 +333,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F65F6DDA58D8AAF6CB01BD87 /* XCLocalSwiftPackageReference "../../Components/iOS/Animated" */,
+				646F500AC04093D5BA298202 /* XCLocalSwiftPackageReference "../../Textures/LiquidGlass" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BE6B8E68ED3BA55D1E86D26D /* Products */;
@@ -273,17 +345,6 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXResourcesBuildPhase section */
-		DA777F146C39D749BF2CB41D /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				B4BB851BBFA871281E3A8FCD /* voice-sample.m4a in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		9B638E069E26633FE37ED5EF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -293,12 +354,17 @@
 				3C68F554CC0AF7C1E604CB29 /* Background.swift in Sources */,
 				AE5E660F32C307B8D68D71D8 /* ColorCustom.swift in Sources */,
 				8F23C9B559AD31CAE4FF4F3E /* ComponentShowcaseApp.swift in Sources */,
-				D75E046C1C94672C7CD00038 /* FollowScrollView.swift in Sources */,
+				136B8F436643D2234A56ACA8 /* ConfigSheet.swift in Sources */,
+				3F3C670A8106FF2DAA171708 /* FollowScroll.swift in Sources */,
+				CA8E1D80C076D74ACE6F785A /* ListApiConfig.swift in Sources */,
+				2081554E666C53C32E8E3C5F /* ListNodeLlmProviders.swift in Sources */,
 				6A34F2872B5674B05F46C88C /* MessageListNode.swift in Sources */,
 				62589A31BF8CC788D2D1AE0C /* NoticeStack.swift in Sources */,
+				4533D07806C9860F573CE57A /* OpenShadersView.swift in Sources */,
 				84271AF7F058F9D7E7641926 /* ReactionToggle.swift in Sources */,
+				B7E68BCAB46B9E893C8437B9 /* ReflectiveCard.swift in Sources */,
+				753843F677D629EEE886912D /* SheetLlmApiKeyConfigSheet.swift in Sources */,
 				D5618D9384ABEA2D25F9F976 /* SwiftPiecesElasticButton.swift in Sources */,
-				23B6A623CD3F38B58051FAAE /* SwiftPiecesFollowScroll.swift in Sources */,
 				FC75F611A360D95028B2B729 /* SwiftPiecesNoticeStack.swift in Sources */,
 				F5B0C8BFF30FBBB1E3F7BB93 /* SwiftPiecesSwipeActionRow.swift in Sources */,
 				475CB3C029971294BBA81E1A /* SwipeActionRow.swift in Sources */,
@@ -490,6 +556,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		646F500AC04093D5BA298202 /* XCLocalSwiftPackageReference "../../Textures/LiquidGlass" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Textures/LiquidGlass;
+		};
 		F65F6DDA58D8AAF6CB01BD87 /* XCLocalSwiftPackageReference "../../Components/iOS/Animated" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Components/iOS/Animated;
@@ -500,6 +570,10 @@
 		7BCA40F03CDB9B26DB163A44 /* Animated */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Animated;
+		};
+		BC9545619100EA255484DA40 /* LiquidGlassKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LiquidGlassKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

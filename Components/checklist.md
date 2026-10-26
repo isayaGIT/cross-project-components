@@ -29,7 +29,7 @@ ImgThumbnail
 RoundedRectSmoothed
 Capsules
 StickerKeyboard
-SheetConfig / BottomSheet
+BottomSheet
 Banner
 Animated/Popin
 MessageListNode
@@ -37,7 +37,7 @@ UnreadBadge
 
 not good enough but considered finished:
 StickerKeyboard (背景、边框要能够自定义; 需要统一所有用到的背景为参数可以传入; 组件出现太生硬缺少动画)
-SheetConfig / BottomSheet
+BottomSheet
 Banner(丑死, 字体大小、字体、背景、边框、shape都要传参数)
 ImgPolaroid(旋转范围只有90度)
 Animated/PressedDown(丑)
@@ -60,3 +60,11 @@ Components todo:
 
 Future Todo:
 头像拍一拍的文本
+剧情聊天希望能用这个动画打包 https://dribbble.com/shots/23071484-Artspace-Book-Slider-Animation
+
+
+这两个拿下来 
+https://swiftpieces.com/docs/components/media/attachment-tray
+https://swiftpieces.com/docs/components/media/now-playing
+https://swiftpieces.com/docs/components/media/voice-recorder
+https://swiftpieces.com/docs/components/text/expandable-text

@@ -132,12 +132,45 @@ public final class LLMRouting: @unchecked Sendable {
     }
 
     private struct RouteTask: Decodable {
-        let hasUISlot: Bool?
-        let provider: String?
-        let model: String?
-        enum CodingKeys: String, CodingKey { case hasUISlot = "has_ui_slot", provider, model }
+        let hasUISlot: JSONValue?
+        let provider: JSONValue?
+        let model: JSONValue?
+        let isTruthyObject: Bool
+
+        private struct Key: CodingKey {
+            let stringValue: String
+            let intValue: Int? = nil
+            init?(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue: Int) { return nil }
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: Key.self)
+            isTruthyObject = !values.allKeys.isEmpty
+            hasUISlot = try values.decodeIfPresent(JSONValue.self, forKey: Key(stringValue: "has_ui_slot")!)
+            provider = try values.decodeIfPresent(JSONValue.self, forKey: Key(stringValue: "provider")!)
+            model = try values.decodeIfPresent(JSONValue.self, forKey: Key(stringValue: "model")!)
+        }
     }
     private struct RoutesDocument: Decodable { let tasks: [String: RouteTask]? }
+
+    /// Python's `not task.get("has_ui_slot")` treats missing, null, false,
+    /// numeric zero, empty strings, and empty containers as false.
+    private static func pythonTruthy(_ value: JSONValue?) -> Bool {
+        guard let value else { return false }
+        switch value {
+        case .null: return false
+        case .bool(let value): return value
+        case .number(let value): return value != 0
+        case .string(let value): return !value.isEmpty
+        case .object(let value): return !value.isEmpty
+        case .array(let value): return !value.isEmpty
+        }
+    }
+
+    private static func routeString(_ value: JSONValue?) -> String {
+        value?.stringValue ?? ""
+    }
     private struct ChatConfiguration: Decodable { let profileId: String?; let provider: String?; let model: String? }
     private struct DynamicCodingKey: CodingKey {
         let stringValue: String
@@ -164,15 +197,15 @@ public final class LLMRouting: @unchecked Sendable {
 
     public func resolve(_ taskKey: String) -> ResolvedConfiguration {
         lock.lock(); defer { lock.unlock() }
-        if let task = loadRoutes()[taskKey], task.hasUISlot == false {
-            let provider = trimmed(task.provider)
+        if let task = loadRoutes()[taskKey], task.isTruthyObject, !Self.pythonTruthy(task.hasUISlot) {
+            let provider = trimmed(Self.routeString(task.provider))
             if !provider.isEmpty, provider != "ui", let selected = profile(id: provider) ?? profile(name: provider) {
-                return resolved(profile: selected, modelOverride: trimmed(task.model))
+                return resolved(profile: selected, modelOverride: trimmed(Self.routeString(task.model)))
             }
             return resolveChatSlot()
         }
-        if taskKey == "ttsExtract" { return resolveTTSSlot(sectionNames: ["ttsExtract", "extract"]) }
-        if taskKey == "ttsAnnotate" { return resolveTTSSlot(sectionNames: ["ttsAnnotate", "annotate"]) }
+        if taskKey == "ttsExtract" { return resolveTTSSlot(key: "extract") }
+        if taskKey == "ttsAnnotate" { return resolveTTSSlot(key: "annotate") }
         if Self.momentsSlotFields[taskKey] != nil { return resolveMomentsSlot(taskKey) }
         return resolveChatSlot()
     }
@@ -207,17 +240,15 @@ public final class LLMRouting: @unchecked Sendable {
         return ResolvedConfiguration(apiUrl: chat.apiUrl, model: model.isEmpty ? chat.model : model, apiKey: chat.apiKey)
     }
 
-    private func resolveTTSSlot(sectionNames: [String]) -> ResolvedConfiguration {
+    private func resolveTTSSlot(key: String) -> ResolvedConfiguration {
         let config = dependencies.loadTTSAnnotationConfig()
         var section: [String: JSONValue]?
-        for name in sectionNames {
-            if let nested = config[name]?.objectValue,
-               !trimmed(nested["profileId"]?.stringValue).isEmpty || !trimmed(nested["model"]?.stringValue).isEmpty {
-                section = nested
-                break
-            }
+        if let nested = config[key]?.objectValue,
+           !trimmed(nested["profileId"]?.stringValue).isEmpty || !trimmed(nested["model"]?.stringValue).isEmpty {
+            section = nested
+        } else if !trimmed(config["profileId"]?.stringValue).isEmpty || !trimmed(config["model"]?.stringValue).isEmpty {
+            section = config
         }
-        if section == nil, !trimmed(config["profileId"]?.stringValue).isEmpty || !trimmed(config["model"]?.stringValue).isEmpty { section = config }
         guard let section else { return resolveChatSlot() }
         let profileID = trimmed(section["profileId"]?.stringValue)
         let model = trimmed(section["model"]?.stringValue)

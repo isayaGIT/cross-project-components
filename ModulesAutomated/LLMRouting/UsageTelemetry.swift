@@ -27,7 +27,14 @@ public actor LLMUsageTelemetry {
         public let now: @Sendable () -> Date
         public let beijingClockString: @Sendable () -> String
         public let log: @Sendable (String) -> Void
-        public init(usageURL: URL, now: @escaping @Sendable () -> Date = { Date() }, beijingClockString: @escaping @Sendable () -> String = { DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium) }, log: @escaping @Sendable (String) -> Void = { print($0) }) {
+        public init(usageURL: URL, now: @escaping @Sendable () -> Date = { Date() }, beijingClockString: @escaping @Sendable () -> String = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(identifier: "Asia/Shanghai")
+            formatter.dateStyle = .none
+            formatter.timeStyle = .medium
+            return formatter.string(from: Date())
+        }, log: @escaping @Sendable (String) -> Void = { print($0) }) {
             self.usageURL = usageURL; self.now = now; self.beijingClockString = beijingClockString; self.log = log
         }
     }
@@ -43,6 +50,10 @@ public actor LLMUsageTelemetry {
 
     /// Records a call and updates both the task aggregate and local-calendar daily aggregate.
     public func record(_ record: Record) {
+        // The Python implementation reloads the JSON file for every record. Refresh here
+        // as well so another process or a separate telemetry instance's updates are not
+        // silently discarded by a stale actor-local snapshot.
+        document = Self.readDocument(at: configuration.usageURL)
         let prompt = record.promptTokens
         let completion = record.completionTokens
         let total = prompt + completion
@@ -89,8 +100,11 @@ public actor LLMUsageTelemetry {
         persist()
     }
 
-    /// Returns a detached dictionary snapshot suitable for UI display or JSON serialization.
-    public func getUsage() -> [String: Any] { document }
+    /// Returns a fresh detached snapshot, including updates made outside this actor.
+    public func getUsage() -> [String: Any] {
+        document = Self.readDocument(at: configuration.usageURL)
+        return document
+    }
 
     public func printRoutingTable(_ routes: [(task: String, provider: String, model: String, hasUISlot: Bool?)]) {
         configuration.log("LLM routing table:")

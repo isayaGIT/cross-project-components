@@ -17,7 +17,7 @@ SwipeActionRow(actions: [
 }
 ```
 
-## FollowScrollView
+## FollowScroll
 
 A chat-oriented list that follows appended items when the reader is near the bottom and shows a “latest messages” affordance when new items arrive while the reader is browsing history.
 
@@ -27,7 +27,7 @@ struct ChatMessage: Identifiable {
     let text: String
 }
 
-FollowScrollView(messages, id: \.id, spacing: 8) { message in
+FollowScroll(messages, style: FollowScrollStyle(spacing: 8)) { message in
     Text(message.text)
         .frame(maxWidth: .infinity, alignment: .leading)
 }
@@ -40,3 +40,7 @@ Import `Animated` and apply `.buttonStyle(.elastic)` to any SwiftUI `Button`. Us
 ## NoticeStack
 
 See [`Trivial/NoticeStack/README.md`](Trivial/NoticeStack/README.md) for the new standalone notification-card stack.
+
+## LiquidBlobBar
+
+See [`Trivial/LiquidBlobBar/README.md`](Trivial/LiquidBlobBar/README.md) for a generic horizontal SwiftUI layout with a configurable static alpha-threshold liquid silhouette between caller-owned views. It does not impose a material or background.

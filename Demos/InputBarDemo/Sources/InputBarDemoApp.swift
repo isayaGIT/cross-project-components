@@ -49,11 +49,10 @@ private struct InputBarDemoView: View {
                     .padding()
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    InputBar(
+                    InputContainer(
                         text: $draft,
-                        placeholder: "Message",
                         isGenerating: isGenerating,
-                        maxLines: 6,
+                        configuration: ScreenChatConfig(),
                         accessoryPanel: AnyView(
                             StickerKeyboard(
                                 stickers: [],
@@ -65,14 +64,17 @@ private struct InputBarDemoView: View {
                                 onSelect: { _ in }
                             )
                         ),
+                        toolsPanel: AnyView(
+                            InputActionPanel(actions: [
+                                .init(id: "camera", title: "Camera", systemImage: "camera") { activeAlert = .attachment },
+                                .init(id: "photos", title: "Photos", systemImage: "photo") { activeAlert = .attachment },
+                                .init(id: "files", title: "Files", systemImage: "doc") { activeAlert = .attachment },
+                                .init(id: "tools", title: "Tools", systemImage: "square.grid.2x2") { activeAlert = .tools }
+                            ])
+                        ),
                         onSend: send,
-                        onStop: { isGenerating = false },
-                        onAttach: { activeAlert = .attachment },
-                        onTools: { activeAlert = .tools }
+                        onStop: { isGenerating = false }
                     )
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
                 }
                 .onChange(of: messages.count) { _, count in
                     withAnimation(.easeOut(duration: 0.2)) {

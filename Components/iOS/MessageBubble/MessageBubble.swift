@@ -280,59 +280,19 @@ public struct MessageBubble<Content: View>: View {
 
     public var body: some View {
         VStack(alignment: metadataAlignment, spacing: 4) {
-            content
-                .font(font)
-                .lineSpacing(lineSpacing)
-                .padding(padding)
-                .frame(width: width, height: height, alignment: alignment)
-                .background {
-                    bubbleShape.fill(fill)
-                }
-                .overlay {
-                    MessageBubbleDecorationLayer(theme: theme)
-                        .clipShape(bubbleShape)
-                        .allowsHitTesting(false)
-                }
-                .overlay(alignment: .topLeading) {
-                    MessageBubbleDecorationLayer(theme: theme, placement: .overlapping)
-                        .allowsHitTesting(false)
-                }
-                .overlay {
-                    GeometryReader { geometry in
-                        switch border {
-                        case .none:
-                            EmptyView()
-                        case .solid(let color, let lineWidth):
-                            bubbleShape
-                                .stroke(color, lineWidth: lineWidth.isFinite ? max(0, lineWidth) : 0)
-                        case .dashed(let configuration, let dashFill, let coordinates, let phase):
-                            // Canvas clips to its own rectangular bounds. Give it an 8pt
-                            // bleed area (the tail is 6pt wide), then translate the original
-                            // zero-origin shape into that area. RoundedRectSmoothed's tail
-                            // geometry assumes a zero-origin rect; passing an inset rect
-                            // directly mixes minX/minY with width/height and distorts the path.
-                            let bleed: CGFloat = 8
-                            let bubbleSize = CGSize(
-                                width: max(0, geometry.size.width - bleed * 2),
-                                height: max(0, geometry.size.height - bleed * 2)
-                            )
-                            let basePath = bubbleShape.path(in: CGRect(origin: .zero, size: bubbleSize))
-                            let expandedPath = basePath.applying(
-                                CGAffineTransform(translationX: bleed, y: bleed)
-                            )
-                            DashedPath(
-                                path: expandedPath,
-                                configuration: configuration,
-                                fill: dashFill,
-                                fillCoordinates: coordinates,
-                                phase: phase
-                            )
-                        }
+            Group {
+                if theme.usesCardGeneral {
+                    CardGeneral(
+                        shape: bubbleShape,
+                        thickness: theme.cardGeneralThickness,
+                        palette: theme.cardGeneralPalette
+                    ) {
+                        bubbleFace
                     }
-                    .padding(-8)
-                    .allowsHitTesting(false)
+                } else {
+                    bubbleFace
                 }
-                .contentShape(bubbleShape)
+            }
 
             if let timestamp {
                 Text(timestamp)
@@ -342,5 +302,57 @@ public struct MessageBubble<Content: View>: View {
                     .accessibilityLabel("Sent at \(timestamp)")
             }
         }
+    }
+
+    /// The face and its decorations/border stay independent from the optional outer material.
+    private var bubbleFace: some View {
+        content
+            .font(font)
+            .lineSpacing(lineSpacing)
+            .padding(padding)
+            .frame(width: width, height: height, alignment: alignment)
+            .background {
+                bubbleShape.fill(fill)
+            }
+            .overlay {
+                MessageBubbleDecorationLayer(theme: theme)
+                    .clipShape(bubbleShape)
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .topLeading) {
+                MessageBubbleDecorationLayer(theme: theme, placement: .overlapping)
+                    .allowsHitTesting(false)
+            }
+            .overlay {
+                GeometryReader { geometry in
+                    switch border {
+                    case .none:
+                        EmptyView()
+                    case .solid(let color, let lineWidth):
+                        bubbleShape
+                            .stroke(color, lineWidth: lineWidth.isFinite ? max(0, lineWidth) : 0)
+                    case .dashed(let configuration, let dashFill, let coordinates, let phase):
+                        let bleed: CGFloat = 8
+                        let bubbleSize = CGSize(
+                            width: max(0, geometry.size.width - bleed * 2),
+                            height: max(0, geometry.size.height - bleed * 2)
+                        )
+                        let basePath = bubbleShape.path(in: CGRect(origin: .zero, size: bubbleSize))
+                        let expandedPath = basePath.applying(
+                            CGAffineTransform(translationX: bleed, y: bleed)
+                        )
+                        DashedPath(
+                            path: expandedPath,
+                            configuration: configuration,
+                            fill: dashFill,
+                            fillCoordinates: coordinates,
+                            phase: phase
+                        )
+                    }
+                }
+                .padding(-8)
+                .allowsHitTesting(false)
+            }
+            .contentShape(bubbleShape)
     }
 }

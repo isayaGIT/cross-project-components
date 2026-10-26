@@ -175,8 +175,8 @@ struct ReflectiveMetalPlate: UIViewRepresentable {
     final class Coordinator { var renderer: ReflectiveCardRenderer? }
 }
 
-/// Shared native border/rim used by Reflective Card and the OpenShaders profile card.
-/// Matches the original card's inset rim + top-edge highlight rather than a decorative gradient outline.
+/// Native translation of the original CSS inset rim:
+/// inset 0 0 0 1px var(--rc-rim), inset 0 1px 0 var(--rc-rim-highlight).
 public struct ReflectiveCardBorder: View {
     public var radius: CGFloat
     public var rimColor: Color
@@ -193,7 +193,20 @@ public struct ReflectiveCardBorder: View {
             .strokeBorder(rimColor, lineWidth: 1)
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [highlightColor, .clear], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    .strokeBorder(highlightColor, lineWidth: 1)
+                    // Keep the highlight on the rounded outline, but confine it to
+                    // a narrow strip at the top so it cannot read as a white patch.
+                    .mask {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .white, location: 0),
+                                .init(color: .white, location: 0.012),
+                                .init(color: .clear, location: 0.035)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
             }
             .allowsHitTesting(false)
     }
@@ -290,8 +303,8 @@ struct ReflectiveCardPreview: View {
         .overlay {
             ReflectiveCardBorder(
                 radius: radius,
-                rimColor: selectedPalette == 1 ? Color.white.opacity(0.08) : palette.ink.opacity(0.07),
-                highlightColor: selectedPalette == 1 ? Color.white.opacity(0.10) : palette.ink.opacity(0.10)
+                rimColor: selectedPalette == 1 ? Color(red: 24 / 255, green: 24 / 255, blue: 27 / 255).opacity(0.08) : palette.ink.opacity(0.07),
+                highlightColor: selectedPalette == 1 ? Color.white.opacity(0.80) : palette.ink.opacity(0.10)
             )
         }
         .shadow(color: .black.opacity(selectedPalette == 1 ? 0.12 : 0.55), radius: 22, x: 0, y: 22)

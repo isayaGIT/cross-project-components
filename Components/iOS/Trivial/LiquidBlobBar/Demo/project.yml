@@ -1,0 +1,28 @@
+name: LiquidBlobBarDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  LiquidBlobBarDemo:
+    type: application
+    platform: iOS
+    sources:
+      - path: LiquidBlobBarDemo.swift
+      - path: ../LiquidBlobBar.swift
+        name: LiquidBlobBar.swift
+      - path: ../LiquidBlobBar.metal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.liquidblobbar-demo
+        PRODUCT_NAME: LiquidBlobBarDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+schemes:
+  LiquidBlobBarDemo:
+    build:
+      targets:
+        LiquidBlobBarDemo: all
+    run:
+      config: Debug

@@ -18,6 +18,8 @@ private enum ShowcasePage: String, CaseIterable, Identifiable {
     case notices = "Notices"
     case reaction = "Reaction"
     case apiKeySheet = "API Key Sheet"
+    case reflectiveCard = "ReflectiveCard"
+    case openShaders = "OpenShaders"
 
     var id: String { rawValue }
 
@@ -29,6 +31,8 @@ private enum ShowcasePage: String, CaseIterable, Identifiable {
         case .notices: "bell.badge.fill"
         case .reaction: "heart.circle.fill"
         case .apiKeySheet: "key.horizontal.fill"
+        case .reflectiveCard: "rectangle.on.rectangle.angled"
+        case .openShaders: "sparkles"
         }
     }
 }
@@ -48,7 +52,8 @@ private struct ShowcaseConversation: Identifiable {
 }
 
 private struct ComponentShowcaseView: View {
-    @State private var selectedPage: ShowcasePage = .apiKeySheet
+    @State private var selectedPage: ShowcasePage = .openShaders
+    @Namespace private var pagePickerNamespace
     @State private var reactionLiked = false
     @State private var reactionSaved = false
     @State private var pressedCount = 0
@@ -100,6 +105,8 @@ private struct ComponentShowcaseView: View {
                         case .notices: noticesPage
                         case .reaction: reactionPage
                         case .apiKeySheet: apiKeySheetPage
+                        case .reflectiveCard: ReflectiveCardPreview()
+                        case .openShaders: OpenShadersDemoView()
                         }
                     }
                     .transition(.opacity)
@@ -137,33 +144,41 @@ private struct ComponentShowcaseView: View {
     }
 
     private var pagePicker: some View {
-        HStack(spacing: 5) {
-            ForEach(ShowcasePage.allCases) { page in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { selectedPage = page }
-                } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: page.symbol)
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(page.rawValue)
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .foregroundStyle(selectedPage == page ? Color.primary : Color.secondary)
-                    .background {
-                        if selectedPage == page {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                                .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(Array(ShowcasePage.allCases.reversed())) { page in
+                    Button {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                            selectedPage = page
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: page.symbol)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(page.rawValue)
+                                .font(.system(size: 12, weight: .semibold))
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(.horizontal, 13)
+                        .frame(height: 36)
+                        .foregroundStyle(selectedPage == page ? Color.primary : Color.secondary)
+                        .background {
+                            if selectedPage == page {
+                                Capsule(style: .continuous)
+                                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                                    .matchedGeometryEffect(id: "showcase.page.selection", in: pagePickerNamespace)
+                            }
+                        }
+                        .contentShape(Capsule())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedPage == page ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
             }
+            .padding(4)
         }
-        .padding(4)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: Capsule(style: .continuous))
+        .overlay(Capsule(style: .continuous).strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
     }
 
     private var gesturesPage: some View {
@@ -318,7 +333,7 @@ private struct ComponentShowcaseView: View {
                 .buttonStyle(.elastic)
             }
 
-            FollowScrollView(messages, id: \.id, spacing: 10) { message in
+            FollowScroll(messages, style: FollowScrollStyle(spacing: 10)) { message in
                 HStack {
                     if message.isOutgoing { Spacer(minLength: 38) }
                     Text(message.text)

@@ -132,15 +132,46 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     // Original default uses the procedural room when no video/camera environment is supplied.
     float fall = smoothstep(-0.55, 0.5, q.y);
     float2 dir = normalize(SWEEP); float2 nrm = float2(-dir.y, dir.x);
+    // Keep the base environment highlight intact, but locally refract its lookup
+    // coordinates through the embedded soft button. This bends the existing
+    // highlight field rather than drawing a new stripe around the button.
+    float2 highlightQ = q;
+    float buttonMask = 0.0;
+    if (u.buttonEnabled > 0.5) {
+        float2 bp = p - float2(0.0, -12.0);
+        float2 bHalf = float2(43.0, 16.0);
+        float br = 8.0;
+        float buttonDistance = length(max(abs(bp) - bHalf + br, 0.0))
+                             + min(max(abs(bp).x - bHalf.x + br, abs(bp).y - bHalf.y + br), 0.0) - br;
+        buttonMask = 1.0 - smoothstep(-3.0, 5.0, buttonDistance);
+        float buttonHeight = mix(7.0, 0.8, u.buttonPressed);
+        float eps = 1.5;
+        float hCenter = rc_buttonHeight(bp, bHalf, br, buttonHeight);
+        float hx = (rc_buttonHeight(bp + float2(eps, 0.0), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(eps, 0.0), bHalf, br, buttonHeight)) / (2.0 * eps);
+        float hy = (rc_buttonHeight(bp + float2(0.0, eps), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(0.0, eps), bHalf, br, buttonHeight)) / (2.0 * eps);
+        // Warp the lookup coordinates of the existing environment highlight, not
+        // its color. Combine the face's broad crown displacement with its slope:
+        // the former bends light across the whole button, the latter turns it
+        // around the softened shoulders. Values are deliberately visible in q
+        // space (the highlight band itself is only ~0.04 q units wide).
+        float2 faceCoord = bp / bHalf;
+        float crown = saturate(hCenter / max(buttonHeight, 0.001));
+        float2 crownBend = faceCoord * crown * mix(0.075, 0.028, u.buttonPressed);
+        float2 shoulderBend = float2(hx, hy) * mix(0.62, 0.24, u.buttonPressed);
+        float2 localBend = crownBend + shoulderBend;
+        // Feather to zero beyond the button so the surrounding card reflection
+        // stays untouched and no hard rectangular sampling boundary is visible.
+        highlightQ += localBend * buttonMask;
+    }
     float flagX = dot(q - float2(0.24, -0.02), nrm);
     float flagS = 1.4142136 * max(length((sigma + 0.08) * nrm), 0.0001);
     float flag = 0.5 * (rc_erf((flagX + 0.09) / flagS) - rc_erf((flagX - 0.09) / flagS));
     float scene = mix(0.85, 0.12, fall) * (1.0 - 0.6 * flag);
     scene *= 1.0 + (grain - 0.5) * brush * 0.3;
-    float keyX = dot(q - float2(-0.1, -0.16), nrm); float keyS = 1.4142136 * max(length((sigma + 0.018) * nrm), 0.0001);
+    float keyX = dot(highlightQ - float2(-0.1, -0.16), nrm); float keyS = 1.4142136 * max(length((sigma + 0.018) * nrm), 0.0001);
     float key = 0.5 * (rc_erf((keyX + 0.022) / keyS) - rc_erf((keyX - 0.022) / keyS));
-    float top = 0.5 * (rc_erf((q.y + 0.6 + 0.12) / (1.4142136 * max(sigma.y + 0.05, 0.0001))) - rc_erf((q.y + 0.6 - 0.12) / (1.4142136 * max(sigma.y + 0.05, 0.0001))));
-    float edge = 0.5 * (rc_erf((q.x - 0.46 + 0.05) / (1.4142136 * max(sigma.x + 0.05, 0.0001))) - rc_erf((q.x - 0.46 - 0.05) / (1.4142136 * max(sigma.x + 0.05, 0.0001))));
+    float top = 0.5 * (rc_erf((highlightQ.y + 0.6 + 0.12) / (1.4142136 * max(sigma.y + 0.05, 0.0001))) - rc_erf((highlightQ.y + 0.6 - 0.12) / (1.4142136 * max(sigma.y + 0.05, 0.0001))));
+    float edge = 0.5 * (rc_erf((highlightQ.x - 0.46 + 0.05) / (1.4142136 * max(sigma.x + 0.05, 0.0001))) - rc_erf((highlightQ.x - 0.46 - 0.05) / (1.4142136 * max(sigma.x + 0.05, 0.0001))));
     float2 toPointer = (u.pointer - p) / (120.0 + u.blur * 4.0);
     float2 spread = toPointer * float2(1.0, 1.0 / (1.0 + 2.5 * u.roughness));
     float reach = dot(spread, spread); float glint = max(1.0 + 3.0 * dot(slope, toPointer), 0.0);
@@ -161,26 +192,9 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float2 bq = abs(bp) - bHalf + br;
         float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
         float face = 1.0 - smoothstep(-1.5, 1.5, bd);
-        // All pressed-state details are continuously weighted by the animated
-        // progress, so the button settles into its pressed geometry instead of
-        // switching abruptly between two shader branches.
-        float pressedRim = exp(-abs(bd) * 0.24) * (1.0 - face * 0.2);
-        float2 lineAxis = normalize(float2(0.58, 0.82));
-        float2 lineNormal = float2(-lineAxis.y, lineAxis.x);
-        float lineDistance = dot(bp - float2(-2.0, 0.0), lineNormal);
-        float lineAlong = dot(bp - float2(-2.0, 0.0), lineAxis);
-        float contactLine = exp(-lineDistance * lineDistance / 34.0)
-                          * smoothstep(-35.0, -25.0, lineAlong)
-                          * (1.0 - smoothstep(24.0, 35.0, lineAlong)) * face;
-        color *= 1.0 - face * 0.24 * u.buttonPressed;
-        color *= 1.0 - pressedRim * 0.15 * u.buttonPressed;
-        color += u.tint * contactLine * 0.22 * u.buttonPressed;
-        // Resting lip: broader and more legible than the previous hairline,
-        // while remaining a soft material edge rather than a full outline.
-        float restingLip = exp(-abs(bd) * 0.22)
-                         * smoothstep(-1.0, 2.5, bp.y)
-                         * (1.0 - face * 0.25);
-        color += u.tint * restingLip * 0.055 * (1.0 - u.buttonPressed);
+        // Keep only subtle pressure shading; the highlight itself is now the
+        // original environment highlight locally warped above, not a painted rim.
+        color *= 1.0 - face * 0.16 * u.buttonPressed;
     }
     color = min(color, 0.7) + 0.3 * (1.0 - exp(-max(color - 0.7, 0.0) / 0.3));
     color = pow(clamp(color, 0.0, 1.0), float3(1.0 / 2.2));

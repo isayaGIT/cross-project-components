@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v13)],
     products: [.library(name: "ProfileCard", targets: ["ProfileCard"])],
     targets: [
-        .target(name: "ProfileCard"),
+        .target(name: "ProfileCard", swiftSettings: [.define("PROFILECARD_STANDALONE")]),
         .testTarget(name: "ProfileCardTests", dependencies: ["ProfileCard"])
     ]
 )

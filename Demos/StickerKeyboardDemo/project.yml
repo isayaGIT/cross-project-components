@@ -10,7 +10,9 @@ packages:
   Animated:
     path: ../../Components/iOS/Animated
   BottomSheet:
-    path: ../../Components/iOS/Trivial/SheetConfig
+    path: ../../Components/iOS/Trivial/BottomSheet
+  LineDashed:
+    path: ../../Shapes/LineDashed
 targets:
   StickerData:
     type: framework
@@ -29,9 +31,16 @@ targets:
     platform: iOS
     sources:
       - Sources
-      - path: ../../Components/iOS/Trivial/StickerKeyboard/StickerKeyboard.swift
-      - path: ../../Components/iOS/Trivial/StickerKeyboard/StickerSearchSheet.swift
+      - path: ../../Components/iOS/ScreenChatContainer/ScreenChat/InputContainer/StickerKeyboard/StickerKeyboard.swift
+      - path: ../../Components/iOS/ScreenChatContainer/ScreenChat/InputContainer/StickerKeyboard/StickerSearchSheet.swift
+      - path: ../../Components/iOS/Trivial/BottomSheet/BottomSheetPresentation.swift
+      - path: ../../Components/iOS/MotionConfigProtocols/MotionConfigProtocol.swift
+      - path: ../../Components/iOS/MotionConfigProtocols/BottomSheetMotionConfigProtocol.swift
+      - path: ../../Components/iOS/MotionConfigProtocols/BottomSheetMotionConfig.swift
       - path: ../../Components/iOS/Trivial/Capsules/CapsuleButton.swift
+      - path: ../../Components/iOS/Trivial/DashedPath/DashedPath.swift
+      - path: ../../Components/iOS/MessageBubble/RoundedRectSmoothed.swift
+      - path: ../../Shapes/RoundedRectSmoothed/BubbleBottomRight.swift
       - path: ../../Components/iOS/Trivial/ContainerStyle/ContainerStyle.swift
       - path: ../../Components/iOS/Trivial/TextFieldCustom/TextFieldCustom.swift
       - path: ../../Class/Background/Background.swift
@@ -50,6 +59,8 @@ targets:
         product: Animated
       - package: BottomSheet
         product: BottomSheet
+      - package: LineDashed
+        product: LineDashed
 schemes:
   StickerKeyboardDemo:
     build:

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		60A57EDA64904F4C05E580D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5110A0455EC86C159B395EBB /* Assets.xcassets */; };
+		6EF24D13A3383DA7D0665FE7 /* ImgView in Frameworks */ = {isa = PBXBuildFile; productRef = F61FCF239A80A26792E6DFEB /* ImgView */; };
 		B5AF4481D5A87D2E0AAC17E1 /* AnimatedShowcaseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF831CF5C97B901E05377DD2 /* AnimatedShowcaseApp.swift */; };
 		E72BFAF04B59FD3B33FF2E3A /* Animated in Frameworks */ = {isa = PBXBuildFile; productRef = F5283B11BCFEE32C5BC85306 /* Animated */; };
 /* End PBXBuildFile section */
@@ -17,6 +18,7 @@
 		669F944E11FB9893AEE5FDCE /* AnimatedShowcaseApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AnimatedShowcaseApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86A53756A77EA647D314EA08 /* Animated */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Animated; path = ../..; sourceTree = SOURCE_ROOT; };
 		DF831CF5C97B901E05377DD2 /* AnimatedShowcaseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedShowcaseApp.swift; sourceTree = "<group>"; };
+		F8B1552C9FCE78A3DF13D093 /* ImgView */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ImgView; path = ../../../ImgView; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -25,6 +27,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E72BFAF04B59FD3B33FF2E3A /* Animated in Frameworks */,
+				6EF24D13A3383DA7D0665FE7 /* ImgView in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,6 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				86A53756A77EA647D314EA08 /* Animated */,
+				F8B1552C9FCE78A3DF13D093 /* ImgView */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -83,6 +87,7 @@
 			name = AnimatedShowcaseApp;
 			packageProductDependencies = (
 				F5283B11BCFEE32C5BC85306 /* Animated */,
+				F61FCF239A80A26792E6DFEB /* ImgView */,
 			);
 			productName = AnimatedShowcaseApp;
 			productReference = 669F944E11FB9893AEE5FDCE /* AnimatedShowcaseApp.app */;
@@ -110,6 +115,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				801063911CCDE0E6E65B39AF /* XCLocalSwiftPackageReference "../.." */,
+				25A63290832C51A69321925D /* XCLocalSwiftPackageReference "../../../ImgView" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C3BD88E63D26832BCE32912 /* Products */;
@@ -321,6 +327,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		25A63290832C51A69321925D /* XCLocalSwiftPackageReference "../../../ImgView" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../ImgView;
+		};
 		801063911CCDE0E6E65B39AF /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
@@ -331,6 +341,10 @@
 		F5283B11BCFEE32C5BC85306 /* Animated */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Animated;
+		};
+		F61FCF239A80A26792E6DFEB /* ImgView */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImgView;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

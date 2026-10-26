@@ -3,13 +3,14 @@ import PackageDescription
 
 let package = Package(
     name: "ImgView",
-    platforms: [.iOS(.v17), .macOS(.v13)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "ImgView", targets: ["ImgView"])],
     dependencies: [
-        .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0")
+        .package(url: "https://github.com/kean/Nuke.git", from: "13.0.0"),
+        .package(path: "../Animated")
     ],
     targets: [
-        .target(name: "ImgView", dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke")], path: "Sources/ImgView"),
+        .target(name: "ImgView", dependencies: [.product(name: "Nuke", package: "Nuke"), .product(name: "NukeUI", package: "Nuke"), .product(name: "Animated", package: "Animated")], path: "Sources/ImgView"),
         .testTarget(name: "ImgViewTests", dependencies: ["ImgView"], path: "Tests/ImgViewTests")
     ]
 )

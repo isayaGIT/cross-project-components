@@ -10,10 +10,10 @@ The shared component owns sheet presentation mechanics: visibility synchronizati
 
 - The vendored `lucaszischka/BottomSheet` Swift package is stored at `Components/iOS/Trivial/SheetConfig`, but its package product and target are already named `BottomSheet`.
 - `Components/iOS/Trivial/SheetCustom/SheetCustom.swift` wraps that package and exposes `SheetCustomHeight`, `SheetCustomConfiguration`, and `SheetCustom`.
-- Sticker Search and ComposeSection use the underlying `.bottomSheet` modifier directly and each maintain presentation state.
+- Sticker Search uses the underlying `.bottomSheet` modifier directly and maintains presentation state.
 - Theme Picker and Apps use SwiftUI `.sheet` with medium/large detents.
 - The current source tree has no active `SheetCustom` call sites outside its own declaration; its wrapper can be removed without a call-site migration.
-- `ComposeSection` is defined in the library but has no references from `ScreenChatDemo`, `ScreenChatContainer`, or `InputContainer`; it is not part of the live demo flow.
+- `ComposeSection` had no call sites anywhere in the repository and was not part of the live demo flow; its unused source was removed as requested.
 - `ScreenChatDemoApp` also owns a native `.sheet` for the model-provider/API-key settings example.
 - Package references exist in the root `Package.swift`, StickerKeyboardDemo's project generator config, and its generated Xcode project.
 
@@ -39,7 +39,7 @@ Delete the `SheetCustom` source and remove `SheetCustomHeight`, `SheetCustomConf
 - **Apps panel:** replace native `.sheet` with `BottomSheet`; preserve `SheetApps` selection callback and current medium/large intent with an appropriate shared height.
 - **Sticker Search:** remove its direct `.bottomSheet` presentation/state adapter and host its existing search content inside `BottomSheet`; preserve the public `StickerSearchSheet(isPresented:configuration:onSearch:)` initializer and its current default 90% height, search history, pack selection, and callbacks.
 - **ScreenChatDemo API-key settings example:** replace its native `.sheet` with `BottomSheet`, preserving provider list content and the selection callback.
-- **ComposeSection:** explicitly out of scope for this ScreenChatDemo-focused migration because it is not used by the active demo call graph. Leave the reusable component untouched; do not broaden this change to unrelated or uninstantiated components.
+- **ComposeSection:** not used by the active demo call graph and had no repository call sites, so its unused source is removed as a separate cleanup.
 
 Do not unify the contents of these sheets or alter unrelated UI. Avoid nested sheet engines and avoid duplicate presentation state synchronization at call sites.
 
@@ -61,7 +61,7 @@ The underlying package remains responsible for gesture mechanics and animation. 
 - Trace the active ScreenChatDemo call graph from `ScreenChatDemoApp` through `ScreenChatContainer`, `ScreenChat`, and `InputContainer`; only migrate active sheet presentations in that flow.
 - Build the root Swift package and StickerKeyboardDemo after updating package paths.
 - Run any relevant tests and compile checks.
-- Search for `SheetConfig`, `SheetCustom`, native `.sheet` presentations in the active ScreenChatDemo flow, and direct `.bottomSheet(` call sites. Do not change `ComposeSection` solely because it contains a bottom-sheet implementation.
+- Search for `SheetConfig`, `SheetCustom`, native `.sheet` presentations in the active ScreenChatDemo flow, and direct `.bottomSheet(` call sites. Confirm there are no remaining code references to `ComposeSection` after deleting its unused source.
 - Do not modify unrelated existing worktree changes. The known independent `ProfileCard.swift` compile error (`profile.status.defaultColor`) should be reported if it blocks a full app build, not fixed as part of this change.
 
 ## Non-Goals

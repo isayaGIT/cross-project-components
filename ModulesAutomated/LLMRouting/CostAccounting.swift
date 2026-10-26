@@ -42,7 +42,27 @@ public enum LLMCostAccounting {
     private static func integer(_ value: Any?) -> Int {
         guard let value, !(value is NSNull) else { return 0 }
         if let number = value as? NSNumber { return number.intValue }
-        if let string = value as? String, let number = Int(string) { return number }
+        if let string = value as? String {
+            // Python int("  12  ") accepts surrounding whitespace; Swift Int does not.
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let number = Int(trimmed) { return number }
+            // Python integer literals also permit single underscores between digits.
+            if isPythonUnderscoredInteger(trimmed),
+               let number = Int(trimmed.replacingOccurrences(of: "_", with: "")) {
+                return number
+            }
+        }
         return 0
+    }
+
+    private static func isPythonUnderscoredInteger(_ value: String) -> Bool {
+        let bytes = Array(value.utf8)
+        guard bytes.contains(95) else { return false } // underscore
+        for index in bytes.indices where bytes[index] == 95 {
+            guard index > 0, index + 1 < bytes.count,
+                  (48...57).contains(bytes[index - 1]),
+                  (48...57).contains(bytes[index + 1]) else { return false }
+        }
+        return true
     }
 }

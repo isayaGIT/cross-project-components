@@ -7,19 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B0015EEC0A6D4F0B9C4B0003 /* ContainerStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0015EEC0A6D4F0B9C4B0004 /* ContainerStyle.swift */; };
+		B001A1100000000000000001 /* MotionConfigProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B001A1100000000000000004 /* MotionConfigProtocol.swift */; };
+		B001A1100000000000000002 /* BottomSheetMotionConfigProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B001A1100000000000000005 /* BottomSheetMotionConfigProtocol.swift */; };
+		B001A1100000000000000003 /* BottomSheetMotionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B001A1100000000000000006 /* BottomSheetMotionConfig.swift */; };
+		E8A2A3B4C5D6E7F801234567 /* BottomSheetPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A2A3B4C5D6E7F801234568 /* BottomSheetPresentation.swift */; };
 		002EE7B2034D01020FDFFD28 /* StickerData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FEAAEE4C2C570A531E54A7A1 /* StickerData.framework */; };
 		0C8F505936F891AEDF8A9973 /* StickerPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC9DAF4B2E75EBF3F0317EF /* StickerPack.swift */; };
 		2140042BEB5E97E8C117760A /* UserStickerConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95A934F60D2DEDB6ACD57EF2 /* UserStickerConfiguration.swift */; };
+		2B2F5E4DD9878C8B14B70F8C /* BubbleBottomRight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D6575B57AEE2A2ECB57D3D /* BubbleBottomRight.swift */; };
+		63CD01C1AD46E66F363BBF4E /* BottomSheet in Frameworks */ = {isa = PBXBuildFile; productRef = D75339E889B7D912A0C25318 /* BottomSheet */; };
 		6A08EF053BC2141B949AE26B /* TextFieldCustom.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05E2B8F94FBFA93F3B40AD2 /* TextFieldCustom.swift */; };
 		7A197C2C194E952695AD6BA0 /* StickerKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2106E5E127962E49AD49FA41 /* StickerKeyboard.swift */; };
 		837F51F8E08EA43E7AD72EAF /* Animated in Frameworks */ = {isa = PBXBuildFile; productRef = 17BC9C398AA8195D40FC4A6F /* Animated */; };
 		87FD8CE810B9181B4BE5E211 /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = AEF0F7008F3A6D1014E435BE /* NukeUI */; };
 		8F76D00320D7CDF2D8209E70 /* StickerData.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FEAAEE4C2C570A531E54A7A1 /* StickerData.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		972F7A021B99E2D14FFDF566 /* Sticker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3C69BF07F09AA685905577 /* Sticker.swift */; };
+		A164C247B549A352873FDFED /* LineDashed in Frameworks */ = {isa = PBXBuildFile; productRef = 174E1283A5B822A3F5B4E9D6 /* LineDashed */; };
 		A2FCCD9D4AE8DD4742226BEA /* ColorCustom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACC736A2142AC66BC946557 /* ColorCustom.swift */; };
 		B37F87DB9A86E79581FA093A /* StickerAsset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4B42A804AFAEB1B262CA86 /* StickerAsset.swift */; };
+		B7CCB23F41C4E08568FD5346 /* RoundedRectSmoothed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 284525CF8344C4579D0EA655 /* RoundedRectSmoothed.swift */; };
+		CC952DC427046AD8CEF87F4C /* DashedPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E6454028E4E29C2125641D /* DashedPath.swift */; };
 		E680FFD8096CA8FCAF70C9BD /* CapsuleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490B41DB216F9A0326726709 /* CapsuleButton.swift */; };
+		F575760620B45A7B86387AFE /* ContainerStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41FD30DDA68B82F5915003D1 /* ContainerStyle.swift */; };
 		F648BA3C6AB64C83FE795232 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = AD522EC25197CD47A3A1308F /* README.md */; };
 		F95283CC719EF463EA1B3A57 /* StickerLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94AB477643260C402632915 /* StickerLibrary.swift */; };
 		FA57289A63E40A49F8AA9562 /* Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE117C93737931CAF2A3F54 /* Background.swift */; };
@@ -52,22 +61,31 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B0015EEC0A6D4F0B9C4B0004 /* ContainerStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerStyle.swift; sourceTree = "<group>"; };
+		B001A1100000000000000004 /* MotionConfigProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../Components/iOS/MotionConfigProtocols/MotionConfigProtocol.swift; sourceTree = SOURCE_ROOT; };
+		B001A1100000000000000005 /* BottomSheetMotionConfigProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../Components/iOS/MotionConfigProtocols/BottomSheetMotionConfigProtocol.swift; sourceTree = SOURCE_ROOT; };
+		B001A1100000000000000006 /* BottomSheetMotionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../Components/iOS/MotionConfigProtocols/BottomSheetMotionConfig.swift; sourceTree = SOURCE_ROOT; };
+		E8A2A3B4C5D6E7F801234568 /* BottomSheetPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../Components/iOS/Trivial/BottomSheet/BottomSheetPresentation.swift; sourceTree = SOURCE_ROOT; };
 		0EC990480FCC77BB2A329728 /* Animated */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Animated; path = ../../Components/iOS/Animated; sourceTree = SOURCE_ROOT; };
 		2106E5E127962E49AD49FA41 /* StickerKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerKeyboard.swift; sourceTree = "<group>"; };
+		284525CF8344C4579D0EA655 /* RoundedRectSmoothed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundedRectSmoothed.swift; sourceTree = "<group>"; };
 		2D3C69BF07F09AA685905577 /* Sticker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sticker.swift; sourceTree = "<group>"; };
 		3A94842728A0CBEF4551ABE8 /* StickerKeyboardDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StickerKeyboardDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		41FD30DDA68B82F5915003D1 /* ContainerStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerStyle.swift; sourceTree = "<group>"; };
 		490B41DB216F9A0326726709 /* CapsuleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsuleButton.swift; sourceTree = "<group>"; };
 		4ACC736A2142AC66BC946557 /* ColorCustom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorCustom.swift; sourceTree = "<group>"; };
 		5FE117C93737931CAF2A3F54 /* Background.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Background.swift; sourceTree = "<group>"; };
 		6F4B42A804AFAEB1B262CA86 /* StickerAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerAsset.swift; sourceTree = "<group>"; };
+		75E6454028E4E29C2125641D /* DashedPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashedPath.swift; sourceTree = "<group>"; };
+		94D6575B57AEE2A2ECB57D3D /* BubbleBottomRight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleBottomRight.swift; sourceTree = "<group>"; };
 		95A934F60D2DEDB6ACD57EF2 /* UserStickerConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStickerConfiguration.swift; sourceTree = "<group>"; };
 		AD522EC25197CD47A3A1308F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		BDC7BABC78BFBE854DFE0237 /* BottomSheet */ = {isa = PBXFileReference; lastKnownFileType = folder; name = BottomSheet; path = ../../Components/iOS/Trivial/BottomSheet; sourceTree = SOURCE_ROOT; };
 		C908A5079D48F691D46C37CF /* StickerKeyboardDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerKeyboardDemoApp.swift; sourceTree = "<group>"; };
 		C94AB477643260C402632915 /* StickerLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerLibrary.swift; sourceTree = "<group>"; };
 		CCA71E3F160AEA3C832512A3 /* StickerSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerSearchSheet.swift; sourceTree = "<group>"; };
 		DDC9DAF4B2E75EBF3F0317EF /* StickerPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerPack.swift; sourceTree = "<group>"; };
 		F05E2B8F94FBFA93F3B40AD2 /* TextFieldCustom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFieldCustom.swift; sourceTree = "<group>"; };
+		FC030135645CA5FBDB6263C9 /* LineDashed */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LineDashed; path = ../../Shapes/LineDashed; sourceTree = SOURCE_ROOT; };
 		FEAAEE4C2C570A531E54A7A1 /* StickerData.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = StickerData.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,6 +97,8 @@
 				002EE7B2034D01020FDFFD28 /* StickerData.framework in Frameworks */,
 				87FD8CE810B9181B4BE5E211 /* NukeUI in Frameworks */,
 				837F51F8E08EA43E7AD72EAF /* Animated in Frameworks */,
+				63CD01C1AD46E66F363BBF4E /* BottomSheet in Frameworks */,
+				A164C247B549A352873FDFED /* LineDashed in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +109,8 @@
 			isa = PBXGroup;
 			children = (
 				0EC990480FCC77BB2A329728 /* Animated */,
+				FC030135645CA5FBDB6263C9 /* LineDashed */,
+				BDC7BABC78BFBE854DFE0237 /* BottomSheet */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -111,6 +133,15 @@
 			path = ../../Components/iOS/Trivial/Capsules;
 			sourceTree = "<group>";
 		};
+		3FE26EA5673EBA13A4D10073 /* ContainerStyle */ = {
+			isa = PBXGroup;
+			children = (
+				41FD30DDA68B82F5915003D1 /* ContainerStyle.swift */,
+			);
+			name = ContainerStyle;
+			path = ../../Components/iOS/Trivial/ContainerStyle;
+			sourceTree = "<group>";
+		};
 		4CC3DAA531941147EDB4775B /* Sticker */ = {
 			isa = PBXGroup;
 			children = (
@@ -125,6 +156,15 @@
 			path = ../../Class/Sticker;
 			sourceTree = "<group>";
 		};
+		5961A09F223FC98FDF4AE861 /* RoundedRectSmoothed */ = {
+			isa = PBXGroup;
+			children = (
+				94D6575B57AEE2A2ECB57D3D /* BubbleBottomRight.swift */,
+			);
+			name = RoundedRectSmoothed;
+			path = ../../Shapes/RoundedRectSmoothed;
+			sourceTree = "<group>";
+		};
 		6583FDFE12B3098AA91FE4F2 /* Background */ = {
 			isa = PBXGroup;
 			children = (
@@ -135,20 +175,16 @@
 			path = ../../Class/Background;
 			sourceTree = "<group>";
 		};
-		B0015EEC0A6D4F0B9C4B0005 /* ContainerStyle */ = {
-			isa = PBXGroup;
-			children = (B0015EEC0A6D4F0B9C4B0004 /* ContainerStyle.swift */,);
-			name = ContainerStyle;
-			path = ../../Components/iOS/Trivial/ContainerStyle;
-			sourceTree = "<group>";
-		};
 		7526702AF6511F5941AAC0E2 = {
 			isa = PBXGroup;
 			children = (
 				6583FDFE12B3098AA91FE4F2 /* Background */,
 				2ED37BADC8CDFC0765D4C6FF /* Capsules */,
-				B0015EEC0A6D4F0B9C4B0005 /* ContainerStyle */,
+				3FE26EA5673EBA13A4D10073 /* ContainerStyle */,
+				EF8ACEE4B0A2F7EE2E8E3A7D /* DashedPath */,
+				9B072A7DC52A8B59F28D243A /* MessageBubble */,
 				1E5646017B091240B413BDA3 /* Packages */,
+				5961A09F223FC98FDF4AE861 /* RoundedRectSmoothed */,
 				7FF3CC91D5515D58E164FEEA /* Sources */,
 				4CC3DAA531941147EDB4775B /* Sticker */,
 				9AC15EAC3C3EEEF66E1D458D /* StickerKeyboard */,
@@ -179,9 +215,28 @@
 			children = (
 				2106E5E127962E49AD49FA41 /* StickerKeyboard.swift */,
 				CCA71E3F160AEA3C832512A3 /* StickerSearchSheet.swift */,
+				E8A2A3B4C5D6E7F801234568 /* BottomSheetPresentation.swift */,
 			);
 			name = StickerKeyboard;
-			path = ../../Components/iOS/Trivial/StickerKeyboard;
+			path = ../../Components/iOS/ScreenChatContainer/ScreenChat/InputContainer/StickerKeyboard;
+			sourceTree = "<group>";
+		};
+		9B072A7DC52A8B59F28D243A /* MessageBubble */ = {
+			isa = PBXGroup;
+			children = (
+				284525CF8344C4579D0EA655 /* RoundedRectSmoothed.swift */,
+			);
+			name = MessageBubble;
+			path = ../../Components/iOS/MessageBubble;
+			sourceTree = "<group>";
+		};
+		EF8ACEE4B0A2F7EE2E8E3A7D /* DashedPath */ = {
+			isa = PBXGroup;
+			children = (
+				75E6454028E4E29C2125641D /* DashedPath.swift */,
+			);
+			name = DashedPath;
+			path = ../../Components/iOS/Trivial/DashedPath;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -222,7 +277,8 @@
 			packageProductDependencies = (
 				AEF0F7008F3A6D1014E435BE /* NukeUI */,
 				17BC9C398AA8195D40FC4A6F /* Animated */,
-				B0015EEC0A6D4F0B9C4B0001 /* BottomSheet */,
+				D75339E889B7D912A0C25318 /* BottomSheet */,
+				174E1283A5B822A3F5B4E9D6 /* LineDashed */,
 			);
 			productName = StickerKeyboardDemo;
 			productReference = 3A94842728A0CBEF4551ABE8 /* StickerKeyboardDemo.app */;
@@ -251,7 +307,8 @@
 			packageReferences = (
 				0E2FE3CFAB7F65645F855F22 /* XCRemoteSwiftPackageReference "Nuke" */,
 				A27EAA9D94FBBA24C1D7FE01 /* XCLocalSwiftPackageReference "../../Components/iOS/Animated" */,
-				B0015EEC0A6D4F0B9C4B0002 /* XCLocalSwiftPackageReference "../../Components/iOS/Trivial/SheetConfig" */,
+				0C6F954652A0301C13D1C5E9 /* XCLocalSwiftPackageReference "../../Components/iOS/Trivial/BottomSheet" */,
+				73F7BB77F0FC1A0C907E724D /* XCLocalSwiftPackageReference "../../Shapes/LineDashed" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8578488B813518E52E99D5C7 /* Products */;
@@ -281,12 +338,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA57289A63E40A49F8AA9562 /* Background.swift in Sources */,
+				2B2F5E4DD9878C8B14B70F8C /* BubbleBottomRight.swift in Sources */,
 				E680FFD8096CA8FCAF70C9BD /* CapsuleButton.swift in Sources */,
-				B0015EEC0A6D4F0B9C4B0003 /* ContainerStyle.swift in Sources */,
 				A2FCCD9D4AE8DD4742226BEA /* ColorCustom.swift in Sources */,
+				F575760620B45A7B86387AFE /* ContainerStyle.swift in Sources */,
+				CC952DC427046AD8CEF87F4C /* DashedPath.swift in Sources */,
+				B7CCB23F41C4E08568FD5346 /* RoundedRectSmoothed.swift in Sources */,
 				7A197C2C194E952695AD6BA0 /* StickerKeyboard.swift in Sources */,
 				FFAC6F53561960CFAD35C387 /* StickerKeyboardDemoApp.swift in Sources */,
 				FA67F7E0B8191436ACA47C23 /* StickerSearchSheet.swift in Sources */,
+				E8A2A3B4C5D6E7F801234567 /* BottomSheetPresentation.swift in Sources */,
+				B001A1100000000000000001 /* MotionConfigProtocol.swift in Sources */,
+				B001A1100000000000000002 /* BottomSheetMotionConfigProtocol.swift in Sources */,
+				B001A1100000000000000003 /* BottomSheetMotionConfig.swift in Sources */,
 				6A08EF053BC2141B949AE26B /* TextFieldCustom.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -552,6 +616,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		0C6F954652A0301C13D1C5E9 /* XCLocalSwiftPackageReference "../../Components/iOS/Trivial/BottomSheet" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Components/iOS/Trivial/BottomSheet;
+		};
+		73F7BB77F0FC1A0C907E724D /* XCLocalSwiftPackageReference "../../Shapes/LineDashed" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Shapes/LineDashed;
+		};
 		A27EAA9D94FBBA24C1D7FE01 /* XCLocalSwiftPackageReference "../../Components/iOS/Animated" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Components/iOS/Animated;
@@ -569,27 +641,23 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		B0015EEC0A6D4F0B9C4B0002 /* XCLocalSwiftPackageReference "../../Components/iOS/Trivial/SheetConfig" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../Components/iOS/Trivial/SheetConfig;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
+		174E1283A5B822A3F5B4E9D6 /* LineDashed */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LineDashed;
+		};
 		17BC9C398AA8195D40FC4A6F /* Animated */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Animated;
-		};
-		B0015EEC0A6D4F0B9C4B0001 /* BottomSheet */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0015EEC0A6D4F0B9C4B0002 /* XCLocalSwiftPackageReference "../../Components/iOS/Trivial/SheetConfig" */;
-			productName = BottomSheet;
 		};
 		AEF0F7008F3A6D1014E435BE /* NukeUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0E2FE3CFAB7F65645F855F22 /* XCRemoteSwiftPackageReference "Nuke" */;
 			productName = NukeUI;
+		};
+		D75339E889B7D912A0C25318 /* BottomSheet */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BottomSheet;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

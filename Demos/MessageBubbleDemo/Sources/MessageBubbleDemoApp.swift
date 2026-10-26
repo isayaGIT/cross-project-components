@@ -20,6 +20,7 @@ private struct MessageBubbleDemoView: View {
   @State private var borderStyle: BorderStyle = .dashed
   @State private var messageFontSize = 16.0
   @State private var messageLineSpacing = 3.0
+  @State private var lastAction = "No action yet"
 
   var body: some View {
     NavigationStack {
@@ -216,6 +217,10 @@ private struct MessageBubbleDemoView: View {
   private var conversation: some View {
     VStack(alignment: .leading, spacing: 14) {
       sectionHeader("LIVE PREVIEW", detail: "Changes apply instantly")
+      Text("Long-press a message, swipe to an action, then release · Last action: \(lastAction)")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityIdentifier("messageBubbleActionStatus")
 
       HStack(alignment: .bottom, spacing: 10) {
         avatar("M", color: .purple)
@@ -241,6 +246,11 @@ private struct MessageBubbleDemoView: View {
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
           }
+          .messageBubbleActions(items: [
+            .init(symbol: "doc.on.doc", label: "Copy") { lastAction = "Copy fired" },
+            .init(symbol: "arrowshape.turn.up.left", label: "Reply") { lastAction = "Reply fired" },
+            .init(symbol: "heart", label: "React") { lastAction = "React fired" }
+          ], tint: .pink)
         }
         Spacer(minLength: 16)
       }
@@ -452,4 +462,8 @@ private enum BorderStyle: String, CaseIterable, Identifiable {
     case .dashed: "Dashed"
     }
   }
+}
+
+#Preview("MessageBubble Playground") {
+  MessageBubbleDemoView()
 }

@@ -6,12 +6,18 @@ options:
 packages:
   Animated:
     path: ../../Components/iOS/Animated
+  LiquidGlass:
+    path: ../../Textures/LiquidGlass
 targets:
   ComponentShowcase:
     type: application
     platform: iOS
     sources:
-      - path: Sources
+      - path: Sources/ComponentShowcaseApp.swift
+      - path: ../../Components/iOS/Imports/ReflectiveCard/ReflectiveCard.swift
+        name: ReflectiveCard.swift
+      - path: ../../Components/iOS/Imports/OpenShaders/SwiftUI/OpenShadersView.swift
+        name: OpenShadersView.swift
       - path: ../../Components/iOS/SwipeActionRow.swift
         name: SwipeActionRow.swift
       - path: ../../Components/iOS/MessageListNode/MessageListNode.swift
@@ -24,8 +30,8 @@ targets:
         name: Avatar.swift
       - path: ../../Components/iOS/Trivial/UnreadBadge/UnreadBadge.swift
         name: UnreadBadge.swift
-      - path: ../../Components/iOS/FollowScrollView.swift
-        name: FollowScrollView.swift
+      - path: ../../Components/iOS/Trivial/FollowScroll/FollowScroll.swift
+        name: FollowScroll.swift
       - path: ../../Components/iOS/VoiceMessage/VoiceMessage.swift
         name: VoiceMessage.swift
       - path: ../../Components/iOS/Trivial/NoticeStack/NoticeStack.swift
@@ -34,8 +40,6 @@ targets:
         name: WaveformScrub.swift
       - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Lists/SwiftPiecesSwipeActionRow.swift
         name: SwiftPiecesSwipeActionRow.swift
-      - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Lists/SwiftPiecesFollowScroll.swift
-        name: SwiftPiecesFollowScroll.swift
       - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Controls/SwiftPiecesElasticButton.swift
         name: SwiftPiecesElasticButton.swift
       - path: ../../Components/iOS/Imports/SwiftPiecesOriginals/Sheets/SwiftPiecesNoticeStack.swift
@@ -52,6 +56,8 @@ targets:
         name: SheetLlmApiKeyConfigSheet.swift
     dependencies:
       - package: Animated
+      - package: LiquidGlass
+        product: LiquidGlassKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.componentshowcase

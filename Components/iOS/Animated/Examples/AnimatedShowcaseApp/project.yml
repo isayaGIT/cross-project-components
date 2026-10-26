@@ -6,6 +6,8 @@ options:
 packages:
   Animated:
     path: ../..
+  ImgViewPackage:
+    path: ../../../ImgView
 targets:
   AnimatedShowcaseApp:
     type: application
@@ -16,6 +18,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: Animated
+      - package: ImgViewPackage
+        product: ImgView
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.animated-showcase

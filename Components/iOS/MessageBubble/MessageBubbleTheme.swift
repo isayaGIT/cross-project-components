@@ -44,9 +44,21 @@ public struct MessageBubbleTheme {
     }
 
     public var decorations: [LottieDecoration]
+    /// Enables shape-matched thickness and elevation for this bubble.
+    public var usesCardGeneral: Bool
+    public var cardGeneralThickness: CGFloat
+    public var cardGeneralPalette: CardGeneralPalette
 
-    public init(decorations: [LottieDecoration] = []) {
+    public init(
+        decorations: [LottieDecoration] = [],
+        usesCardGeneral: Bool = false,
+        cardGeneralThickness: CGFloat = 5,
+        cardGeneralPalette: CardGeneralPalette = .pearl
+    ) {
         self.decorations = decorations
+        self.usesCardGeneral = usesCardGeneral
+        self.cardGeneralThickness = max(0, cardGeneralThickness)
+        self.cardGeneralPalette = cardGeneralPalette
     }
 
     public static let `default` = MessageBubbleTheme()

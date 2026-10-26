@@ -1,5 +1,6 @@
 import SwiftUI
 import Animated
+import ImgView
 
 @main
 struct AnimatedShowcaseApp: App {
@@ -9,11 +10,16 @@ struct AnimatedShowcaseApp: App {
 }
 
 private struct AnimatedShowcase: View {
-    @State private var showPopIn = false
     @State private var showDragToDismiss = false
     @State private var pressScale: Double = 0.94
     @State private var pressDuration: Double = 0.12
     @State private var popSpeed: Double = 1.0
+
+    private let popInImage = ImgViewImage(
+        id: "pop-in-landscape",
+        url: URL(string: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?fm=jpg&fit=max&w=6000&q=90")!,
+        previewURL: URL(string: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=max&w=480&q=35")!
+    )
 
     var body: some View {
         ZStack {
@@ -25,7 +31,21 @@ private struct AnimatedShowcase: View {
                         Text("Two independent interaction experiments").font(.subheadline).foregroundStyle(.secondary)
                     }
 
-                    sectionHeader("01", title: "PressedDown", subtitle: "Press and hold the card. Release to spring back.")
+                    sectionHeader("01", title: "CoverFlow One", subtitle: "Drag horizontally, flick to throw, or use the arrows. The center card snaps into focus.")
+                    VStack(spacing: 14) {
+                        CoverFlowCarousel(
+                            slides: coverFlowSlides,
+                            cardWidth: 158,
+                            showsCaption: true,
+                            showsPagination: true,
+                            showsNavigation: true
+                        )
+                        .padding(.vertical, 8)
+                    }
+                    .padding(16)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 24))
+
+                    sectionHeader("02", title: "PressedDown", subtitle: "Press and hold the card. Release to spring back.")
                     VStack(spacing: 18) {
                         Button {} label: {
                             HStack(spacing: 14) {
@@ -51,40 +71,50 @@ private struct AnimatedShowcase: View {
                     .padding(16)
                     .background(.background, in: RoundedRectangle(cornerRadius: 24))
 
-                    sectionHeader("02", title: "PopIn", subtitle: "Tap the avatar. A complete contact card grows out of that exact spot.")
+                    sectionHeader("03", title: "ImgView + PopIn", subtitle: "Tap the photo. ImgView opens from that thumbnail; transition wiring lives inside the reusable link component.")
                     VStack(spacing: 16) {
-                        Button { showPopIn = true } label: {
-                            HStack(spacing: 14) {
-                                Image("PopInPhoto")
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 68, height: 68)
-                                    .clipShape(Circle())
-                                    .popInSource(id: "moment-pop-source")
-                                    .opacity(showPopIn ? 0 : 1)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("Alex Morgan").font(.headline)
-                                    Text("Product designer · Berlin").font(.subheadline).foregroundStyle(.secondary)
-                                    Text("Tap to view contact card").font(.caption).foregroundStyle(.indigo)
+                        ImgViewPopInLink(
+                            images: [popInImage],
+                            speed: popSpeed,
+                            sourceCornerRadius: 22,
+                            destinationCornerRadius: 0
+                        ) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                AsyncImage(url: popInImage.previewURL) { phase in
+                                    if let image = phase.image {
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } else {
+                                        Rectangle().fill(.quaternary).overlay(ProgressView())
+                                    }
                                 }
-                                Spacer(minLength: 0)
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .font(.title3)
-                                    .foregroundStyle(.secondary)
+                                .frame(height: 190)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Open image viewer").font(.headline)
+                                        Text("Zoom · Pan · Swipe to dismiss").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .font(.title3)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(14)
                             }
-                            .padding(16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.background, in: RoundedRectangle(cornerRadius: 22))
+                            .background(.background, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+
                         VStack(spacing: 14) {
                             parameterSlider("Speed", value: $popSpeed, range: 0.5...2.5, valueText: String(format: "%.1f×", popSpeed))
                         }
                     }
                     .padding(16)
                     .background(.background, in: RoundedRectangle(cornerRadius: 24))
-                    
-                    sectionHeader("03", title: "DragToDismiss", subtitle: "Drag the photo in any direction. Let go early to spring back, or flick to dismiss.")
+
+                    sectionHeader("04", title: "DragToDismiss", subtitle: "Drag the photo in any direction. Let go early to spring back, or flick to dismiss.")
                     Button { showDragToDismiss = true } label: {
                         HStack(spacing: 14) {
                             Image("PopInPhoto")
@@ -142,81 +172,33 @@ private struct AnimatedShowcase: View {
                 .zIndex(200)
             }
         }
-        .popInTransition(
-            isPresented: $showPopIn,
-            id: "moment-pop-source",
-            speed: popSpeed,
-            // Use the full available width so the backdrop never forms grey side gutters.
-            destinationAspectRatio: nil,
-            sourceCornerRadius: 34,
-            destinationCornerRadius: 30,
-            backdropOpacity: 0.2,
-            backdropBlurOpacity: 0.42,
-            contentRevealStart: 0.18,
-            contentRevealEnd: 0.64
-        ) {
-            VStack(spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    Image("PopInPhoto")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 250)
-                        .clipped()
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                        Button { showPopIn = false } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(.black.opacity(0.38), in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Close contact card")
-                    }
-                    .padding(18)
-                }
 
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Alex Morgan").font(.title2.bold())
-                        Text("Product Designer").font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    Text("Designing thoughtful digital experiences. Usually found sketching interfaces or exploring a new city.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+    }
 
-                    HStack(spacing: 10) {
-                        Label("Berlin", systemImage: "mappin.and.ellipse")
-                        Label("12 mutuals", systemImage: "person.2")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                    HStack(spacing: 10) {
-                        Button {} label: {
-                            Label("Message", systemImage: "bubble.left.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Button {} label: {
-                            Image(systemName: "phone.fill")
-                                .frame(width: 48, height: 42)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                .padding(22)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background)
-            }
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+    private var coverFlowSlides: [CoverFlowSlide] {
+        let items: [(String, String, String, Color)] = [
+            ("sun.max.fill", "Tidewater", "Long Player", .orange),
+            ("moon.stars.fill", "Nightshift", "Long Player", .indigo),
+            ("sparkles", "Overexposed", "Single", .pink),
+            ("bird.fill", "Slow Bloom", "EP", .teal),
+            ("hand.raised.fill", "Open Palm", "Single", .purple),
+            ("leaf.fill", "Low Country", "Long Player", .green),
+            ("sun.horizon.fill", "Dry Season", "EP", .yellow),
+            ("tree.fill", "Understory", "Single", .mint),
+            ("cloud.fog.fill", "Paper Lantern", "Single", .cyan),
+            ("water.waves", "Still Water", "Long Player", .blue),
+            ("bolt.fill", "Third Rail", "EP", .red),
+            ("snowflake", "Undertow", "Single", .gray)
+        ]
+        return items.map { item in
+            CoverFlowSlide(
+                id: item.1,
+                image: Image(systemName: item.0).renderingMode(.template),
+                accessibilityLabel: item.1,
+                title: item.1,
+                subtitle: item.2,
+                metadata: [(label: "Collection", value: "CoverFlow Demo")]
+            )
         }
     }
 

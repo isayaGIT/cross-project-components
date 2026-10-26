@@ -1,0 +1,1 @@
+`CanvasNodeView` owns selection hit-testing and zoom-aware node movement. The host owns canvas layout, blank-canvas clicks, and persistence/model mutations. Selection outline and node controls are separate reusable views so applications can configure their appearance and provide their own delete/resize/rotate behavior.
