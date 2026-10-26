@@ -100,7 +100,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float br = 8.0;
         float2 bq = abs(bp) - bHalf + br;
         float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
-        float buttonHeight = (u.buttonPressed > 0.5 ? 2.0 : 7.0);
+        float buttonHeight = (u.buttonPressed > 0.5 ? 0.8 : 7.0);
         // Derive the normal from the same continuous height field at rest and
         // while pressed. The resulting reflection bends the existing diagonal
         // environment highlight instead of translating the highlight in screen
@@ -108,7 +108,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float eps = 1.5;
         float hx = (rc_buttonHeight(bp + float2(eps, 0.0), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(eps, 0.0), bHalf, br, buttonHeight)) / (2.0 * eps);
         float hy = (rc_buttonHeight(bp + float2(0.0, eps), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(0.0, eps), bHalf, br, buttonHeight)) / (2.0 * eps);
-        float normalStrength = (u.buttonPressed > 0.5 ? 1.0 : 1.7);
+        float normalStrength = (u.buttonPressed > 0.5 ? 0.65 : 1.7);
         slope -= float2(hx, hy) * normalStrength;
     }
     float2 wp = p / (220.0 * u.warpScale);
@@ -152,6 +152,25 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     float3 dark = float3(0.005, 0.005, 0.006) + u.tint * (scene * 0.05 * u.metalness + highlight * 0.36);
     float3 light = u.tint * (float3(0.83, 0.83, 0.85) * (1.0 - 0.45 * u.metalness * (1.0 - clamp(scene, 0.0, 1.0))) + highlight * 0.35);
     float3 color = mix(dark, light, u.theme);
+    if (u.buttonEnabled > 0.5) {
+        float2 bp = p - float2(0.0, -12.0);
+        float2 bHalf = float2(43.0, 16.0);
+        float br = 8.0;
+        float2 bq = abs(bp) - bHalf + br;
+        float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
+        float face = 1.0 - smoothstep(-1.5, 1.5, bd);
+        float rim = exp(-abs(bd) * 0.42) * (1.0 - face * 0.35);
+        if (u.buttonPressed > 0.5) {
+            // Visible tactile state: depress the face, deepen the inner edge,
+            // and soften its reflection while the finger is held down.
+            color *= 1.0 - face * 0.24;
+            color *= 1.0 - rim * 0.10;
+        } else {
+            // A restrained upper rim keeps the resting button visibly raised.
+            float upperRim = rim * smoothstep(-0.8, 1.8, bp.y);
+            color += u.tint * upperRim * 0.035;
+        }
+    }
     color = min(color, 0.7) + 0.3 * (1.0 - exp(-max(color - 0.7, 0.0) / 0.3));
     color = pow(clamp(color, 0.0, 1.0), float3(1.0 / 2.2));
     color += (rc_hash(in.position.xy) - 0.5) / 255.0; color = clamp(color, 0.0, 1.0);

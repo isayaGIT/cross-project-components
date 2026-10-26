@@ -53,9 +53,9 @@ private struct CardGeneralPlayground: View {
     @ViewBuilder
     private var demoCard: some View {
         if useCircle {
-            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: true, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
+            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: false, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
         } else {
-            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: true, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
+            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: true, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: true, embeddedButtonPressed: false, onEmbeddedButtonTap: { embeddedButtonTapCount += 1 }) { cardContent }
         }
     }
 
