@@ -1,13 +1,14 @@
 # LLM Routes Demo
 
-An isolated, native SwiftUI experiment for the LLM Routes screen. It deliberately leaves the reusable component implementations untouched.
+An isolated, native SwiftUI recreation of the LLM Routes reference screen. It keeps the reference's compact serif heading, horizontal scenic task carousel, pastel canvas, and eight-row task-routing panel. Scenic artwork is bundled as individual image assets; the surrounding interface is real SwiftUI, not a flattened screenshot.
 
-## What it demonstrates
+## Interactions
 
-- A horizontal carousel of actual SwiftUI screen hierarchies rendered through the existing `ScreenMiniature` component (chat, research, summary, code, and memory). These are not stock photos or unrelated decorative images.
-- A route list showing the task on the left and provider/model on the right.
-- Selecting a miniature highlights its matching route; tapping a route opens a compact provider/model picker.
-- Spring-based selection, subtle card scaling, and press feedback.
+- Swipe the horizontal carousel or use its arrows to move between task previews. The selected carousel position and pagination dots stay synchronized.
+- Tap any route row to open the provider/model picker. Choosing a provider updates that row's provider and model.
+- The settings control can reset provider assignments; the Add Route control explains that all eight reference routes are already configured in this fixed demo.
+
+Route assignments are local demo state and are not connected to the app's real LLM configuration.
 
 ## Run
 
@@ -17,5 +18,3 @@ Open `LLMRoutesDemo.xcodeproj`, choose the `LLMRoutesDemo` scheme, and run on an
 cd Components/iOS/ScreenMiniature/Examples/LLMRoutesDemo
 xcodegen generate
 ```
-
-This is an experimental visual prototype; its route data is local demo state and is not connected to the app's real LLM configuration.
