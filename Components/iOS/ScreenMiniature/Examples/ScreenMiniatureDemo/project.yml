@@ -1,0 +1,30 @@
+name: ScreenMiniatureDemo
+options:
+  bundleIdPrefix: dev.crossprojectcomponents
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  ScreenMiniature:
+    path: ../..
+targets:
+  ScreenMiniatureDemo:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crossprojectcomponents.screenminiaturedemo
+        PRODUCT_NAME: ScreenMiniatureDemo
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - package: ScreenMiniature
+        product: ScreenMiniature
+schemes:
+  ScreenMiniatureDemo:
+    build:
+      targets:
+        ScreenMiniatureDemo: all
+    run:
+      config: Debug
