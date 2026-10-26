@@ -23,6 +23,8 @@ private struct CardGeneralMetalUniforms {
     var tint: SIMD3<Float> = SIMD3(1, 1, 1)
     var padding: Float = 0
     var presence: Float = 1
+    var highlightOnly: Float = 0
+    var shapeKind: Float = 0
 }
 
 final class CardGeneralMetalRenderer: NSObject, MTKViewDelegate {
@@ -41,7 +43,7 @@ final class CardGeneralMetalRenderer: NSObject, MTKViewDelegate {
     private static let shaderSource = #"""
 #include <metal_stdlib>
 using namespace metal;
-struct CardGeneralMetalUniforms { float2 size; float2 pointer; float2 tilt; float scale; float time; float radius; float metalness; float roughness; float blur; float warp; float warpScale; float shine; float bevel; float glare; float capture; float grayscale; float theme; float3 tint; float padding; float presence; };
+struct CardGeneralMetalUniforms { float2 size; float2 pointer; float2 tilt; float scale; float time; float radius; float metalness; float roughness; float blur; float warp; float warpScale; float shine; float bevel; float glare; float capture; float grayscale; float theme; float3 tint; float padding; float presence; float highlightOnly; float shapeKind; };
 struct RCVertexOut { float4 position [[position]]; float2 uv; };
 vertex RCVertexOut rc_vertex(uint id [[vertex_id]]) {
     constexpr float2 p[3] = {float2(-1,-1),float2(3,-1),float2(-1,3)};
@@ -70,6 +72,12 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     else if (corner.x > corner.y) { d = corner.x - r; outward = float2(side.x, 0.0); }
     else { d = corner.y - r; outward = float2(0.0, side.y); }
     float coverage = clamp(0.5 - d * u.scale, 0.0, 1.0);
+    // A circular content highlight uses a circular SDF, independently of the rim shape.
+    if (u.highlightOnly > 0.5 && u.shapeKind > 0.5) {
+        float circleRadius = min(halfSize.x, halfSize.y);
+        float circleDistance = length(p) - circleRadius;
+        coverage = clamp(0.5 - circleDistance * u.scale, 0.0, 1.0);
+    }
     float chamferWidth = min(u.bevel, max(r, 1.0));
     float chamfer = chamferWidth > 0.01 ? 1.0 - smoothstep(0.0, chamferWidth, -d) : 0.0;
     float2 slope = outward * chamfer;
@@ -113,6 +121,22 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     color = min(color, 0.7) + 0.3 * (1.0 - exp(-max(color - 0.7, 0.0) / 0.3));
     color = pow(clamp(color, 0.0, 1.0), float3(1.0 / 2.2));
     color += (rc_hash(in.position.xy) - 0.5) / 255.0; color = clamp(color, 0.0, 1.0);
+    if (u.highlightOnly > 0.5) {
+        // Extract the highlight's color contribution from the original dark/light
+        // material equations. Keep tint, theme and metalness in the same path as
+        // the original shader instead of painting a generic translucent white.
+        float3 highlightContribution = mix(
+            u.tint * (highlight * 0.36),
+            u.tint * (highlight * 0.35),
+            u.theme
+        ) * mix(0.4, 1.0, u.metalness);
+        float highlightLuma = dot(max(highlightContribution, float3(0.0)), LUMA);
+        float highlightAlpha = clamp(highlightLuma * 1.8, 0.0, 0.82) * coverage;
+        float3 highlightColor = highlightLuma > 0.0001
+            ? clamp(highlightContribution / max(highlightLuma, 0.0001), 0.0, 1.0)
+            : float3(0.0);
+        return float4(highlightColor * highlightAlpha, highlightAlpha);
+    }
     return float4(color * coverage, coverage);
 }
 """#
@@ -143,6 +167,13 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     }
 
     func setPalette(tint: SIMD3<Float>, theme: Float) { uniforms.tint = tint; uniforms.theme = theme }
+    func setHighlightOnly(_ enabled: Bool, shapeKind: Float, shine: Float, blur: Float, glare: Float) {
+        uniforms.highlightOnly = enabled ? 1 : 0
+        uniforms.shapeKind = shapeKind
+        uniforms.shine = max(0, shine)
+        uniforms.blur = max(0, blur)
+        uniforms.glare = max(0, glare)
+    }
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { uniforms.size = SIMD2(Float(size.width), Float(size.height)) }
     func draw(in view: MTKView) {
         guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable, let command = queue.makeCommandBuffer(), let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
@@ -162,6 +193,11 @@ struct CardGeneralMetalPlate: UIViewRepresentable {
     @Binding var isTouching: Bool
     var tint: SIMD3<Float> = SIMD3(1, 1, 1)
     var theme: Float = 0
+    var highlightOnly: Bool = false
+    var highlightShine: Float = 1
+    var highlightBlur: Float = 6
+    var highlightGlare: Float = 0
+    var highlightUsesCircle: Bool = false
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice()); view.isOpaque = false; view.preferredFramesPerSecond = 60
         context.coordinator.renderer = CardGeneralMetalRenderer(view: view)
@@ -170,6 +206,7 @@ struct CardGeneralMetalPlate: UIViewRepresentable {
     func updateUIView(_ view: MTKView, context: Context) {
         context.coordinator.renderer?.aim(touchPoint, in: view.bounds.size, active: isTouching)
         context.coordinator.renderer?.setPalette(tint: tint, theme: theme)
+        context.coordinator.renderer?.setHighlightOnly(highlightOnly, shapeKind: highlightUsesCircle ? 1 : 0, shine: highlightShine, blur: highlightBlur, glare: highlightGlare)
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
     final class Coordinator { var renderer: CardGeneralMetalRenderer? }
@@ -201,13 +238,36 @@ public struct CardGeneral<S: Shape, Content: View>: View {
     private let palette: CardGeneralPalette
     private let thickness: CGFloat
     private let content: Content
+    private let showsCenterHighlights: Bool
+    private let centerHighlightOpacity: Double
+    private let centerHighlightShine: Float
+    private let centerHighlightBlur: Float
+    private let centerHighlightGlare: Float
+    private let centerHighlightUsesCircle: Bool
     @State private var touchPoint: CGPoint = .zero
     @State private var isTouching = false
 
-    public init(shape: S, thickness: CGFloat = 6, palette: CardGeneralPalette = .pearl, @ViewBuilder content: () -> Content) {
+    public init(
+        shape: S,
+        thickness: CGFloat = 6,
+        palette: CardGeneralPalette = .pearl,
+        showsCenterHighlights: Bool = false,
+        centerHighlightOpacity: Double = 0.7,
+        centerHighlightShine: Float = 1,
+        centerHighlightBlur: Float = 6,
+        centerHighlightGlare: Float = 0,
+        centerHighlightUsesCircle: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) {
         self.shape = shape
         self.palette = palette
         self.thickness = max(1, thickness)
+        self.showsCenterHighlights = showsCenterHighlights
+        self.centerHighlightOpacity = min(max(centerHighlightOpacity, 0), 1)
+        self.centerHighlightShine = centerHighlightShine
+        self.centerHighlightBlur = centerHighlightBlur
+        self.centerHighlightGlare = centerHighlightGlare
+        self.centerHighlightUsesCircle = centerHighlightUsesCircle
         self.content = content()
     }
 
@@ -219,12 +279,21 @@ public struct CardGeneral<S: Shape, Content: View>: View {
                     CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme)
                         .mask { shape.stroke(lineWidth: thickness * 0.25) }
 
-                    // Experimental second pass: restore a soft white specular highlight
-                    // over the narrow rim without changing the saved 0.7x checkpoint.
-                    CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: SIMD3<Float>(repeating: 1), theme: 1)
-                        .mask { shape.stroke(lineWidth: thickness * 0.25) }
-                        .blendMode(.screen)
-                        .opacity(0.28)
+                    // Separate highlight pass, using the selected palette rather than a hard-coded white tint.
+                    if showsCenterHighlights {
+                        CardGeneralMetalPlate(
+                            touchPoint: $touchPoint,
+                            isTouching: $isTouching,
+                            tint: palette.tint,
+                            theme: palette.theme,
+                            highlightOnly: true,
+                            highlightShine: centerHighlightShine,
+                            highlightBlur: centerHighlightBlur,
+                            highlightGlare: centerHighlightGlare,
+                            highlightUsesCircle: centerHighlightUsesCircle
+                        )
+                        .opacity(centerHighlightOpacity)
+                    }
                 }
                 .allowsHitTesting(false)
             }
@@ -239,7 +308,27 @@ public struct CardGeneral<S: Shape, Content: View>: View {
 }
 
 public extension View {
-    func cardGeneral<S: Shape>(shape: S, thickness: CGFloat = 6, palette: CardGeneralPalette = .pearl) -> some View {
-        CardGeneral(shape: shape, thickness: thickness, palette: palette) { self }
+    func cardGeneral<S: Shape>(
+        shape: S,
+        thickness: CGFloat = 6,
+        palette: CardGeneralPalette = .pearl,
+        showsCenterHighlights: Bool = false,
+        centerHighlightOpacity: Double = 0.7,
+        centerHighlightShine: Float = 1,
+        centerHighlightBlur: Float = 6,
+        centerHighlightGlare: Float = 0,
+        centerHighlightUsesCircle: Bool = false
+    ) -> some View {
+        CardGeneral(
+            shape: shape,
+            thickness: thickness,
+            palette: palette,
+            showsCenterHighlights: showsCenterHighlights,
+            centerHighlightOpacity: centerHighlightOpacity,
+            centerHighlightShine: centerHighlightShine,
+            centerHighlightBlur: centerHighlightBlur,
+            centerHighlightGlare: centerHighlightGlare,
+            centerHighlightUsesCircle: centerHighlightUsesCircle
+        ) { self }
     }
 }
