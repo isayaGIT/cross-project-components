@@ -20,7 +20,7 @@
 		738880D97064C1562FEC60E7 /* LLMRoutesDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LLMRoutesDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A315E89D7B27412F1295A300 /* LLMRoutesDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRoutesDemoView.swift; sourceTree = "<group>"; };
 		A61FDBACD08E3773E4ED5BD7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		B19EEA7A629A28D4EE03FC97 /* ScreenMiniature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScreenMiniature; path = ../..; sourceTree = SOURCE_ROOT; };
+		B19EEA7A629A28D4EE03FC97 /* ScreenMiniature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScreenMiniature; path = ../../ScreenMiniature; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,7 +115,7 @@
 			mainGroup = C704EB3B6371C7F833723F20;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				8DF1AB4F3F901F54AC95D79B /* XCLocalSwiftPackageReference "../.." */,
+				F6336992094BAA580EF7256E /* XCLocalSwiftPackageReference "../../ScreenMiniature" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C9AB1666A8C7B68FED756E1D /* Products */;
@@ -346,9 +346,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		8DF1AB4F3F901F54AC95D79B /* XCLocalSwiftPackageReference "../.." */ = {
+		F6336992094BAA580EF7256E /* XCLocalSwiftPackageReference "../../ScreenMiniature" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../..;
+			relativePath = ../../ScreenMiniature;
 		};
 /* End XCLocalSwiftPackageReference section */
 
