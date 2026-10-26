@@ -40,6 +40,8 @@ final class CardGeneralMetalRenderer: NSObject, MTKViewDelegate {
     private var currentPointer = SIMD2<Float>(repeating: 0)
     private var targetGlare: Float = 0
     private var currentGlare: Float = 0
+    private var targetButtonPressed: Float = 0
+    private var currentButtonPressed: Float = 0
     private var lastTime = CACurrentMediaTime()
 
     private static let shaderSource = #"""
@@ -100,7 +102,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float br = 8.0;
         float2 bq = abs(bp) - bHalf + br;
         float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
-        float buttonHeight = (u.buttonPressed > 0.5 ? 0.8 : 7.0);
+        float buttonHeight = mix(7.0, 0.8, u.buttonPressed);
         // Derive the normal from the same continuous height field at rest and
         // while pressed. The resulting reflection bends the existing diagonal
         // environment highlight instead of translating the highlight in screen
@@ -108,7 +110,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float eps = 1.5;
         float hx = (rc_buttonHeight(bp + float2(eps, 0.0), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(eps, 0.0), bHalf, br, buttonHeight)) / (2.0 * eps);
         float hy = (rc_buttonHeight(bp + float2(0.0, eps), bHalf, br, buttonHeight) - rc_buttonHeight(bp - float2(0.0, eps), bHalf, br, buttonHeight)) / (2.0 * eps);
-        float normalStrength = (u.buttonPressed > 0.5 ? 0.65 : 1.7);
+        float normalStrength = mix(1.7, 0.65, u.buttonPressed);
         slope -= float2(hx, hy) * normalStrength;
     }
     float2 wp = p / (220.0 * u.warpScale);
@@ -159,21 +161,26 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         float2 bq = abs(bp) - bHalf + br;
         float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
         float face = 1.0 - smoothstep(-1.5, 1.5, bd);
-        if (u.buttonPressed > 0.5) {
-            // Pressed state: a broad diagonal contact reflection reinforces
-            // compression. The resting state intentionally has no painted line.
-            float pressedRim = exp(-abs(bd) * 0.24) * (1.0 - face * 0.2);
-            float2 lineAxis = normalize(float2(0.58, 0.82));
-            float2 lineNormal = float2(-lineAxis.y, lineAxis.x);
-            float lineDistance = dot(bp - float2(-2.0, 0.0), lineNormal);
-            float lineAlong = dot(bp - float2(-2.0, 0.0), lineAxis);
-            float contactLine = exp(-lineDistance * lineDistance / 20.0)
-                              * smoothstep(-35.0, -25.0, lineAlong)
-                              * (1.0 - smoothstep(24.0, 35.0, lineAlong)) * face;
-            color *= 1.0 - face * 0.24;
-            color *= 1.0 - pressedRim * 0.15;
-            color += u.tint * contactLine * 0.22;
-        }
+        // All pressed-state details are continuously weighted by the animated
+        // progress, so the button settles into its pressed geometry instead of
+        // switching abruptly between two shader branches.
+        float pressedRim = exp(-abs(bd) * 0.24) * (1.0 - face * 0.2);
+        float2 lineAxis = normalize(float2(0.58, 0.82));
+        float2 lineNormal = float2(-lineAxis.y, lineAxis.x);
+        float lineDistance = dot(bp - float2(-2.0, 0.0), lineNormal);
+        float lineAlong = dot(bp - float2(-2.0, 0.0), lineAxis);
+        float contactLine = exp(-lineDistance * lineDistance / 34.0)
+                          * smoothstep(-35.0, -25.0, lineAlong)
+                          * (1.0 - smoothstep(24.0, 35.0, lineAlong)) * face;
+        color *= 1.0 - face * 0.24 * u.buttonPressed;
+        color *= 1.0 - pressedRim * 0.15 * u.buttonPressed;
+        color += u.tint * contactLine * 0.22 * u.buttonPressed;
+        // Resting lip: broader and more legible than the previous hairline,
+        // while remaining a soft material edge rather than a full outline.
+        float restingLip = exp(-abs(bd) * 0.22)
+                         * smoothstep(-1.0, 2.5, bp.y)
+                         * (1.0 - face * 0.25);
+        color += u.tint * restingLip * 0.055 * (1.0 - u.buttonPressed);
     }
     color = min(color, 0.7) + 0.3 * (1.0 - exp(-max(color - 0.7, 0.0) / 0.3));
     color = pow(clamp(color, 0.0, 1.0), float3(1.0 / 2.2));
@@ -224,7 +231,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     }
 
     func setPalette(tint: SIMD3<Float>, theme: Float) { uniforms.tint = tint; uniforms.theme = theme }
-    func setEmbeddedButton(enabled: Bool, pressed: Bool) { uniforms.buttonEnabled = enabled ? 1 : 0; uniforms.buttonPressed = pressed ? 1 : 0 }
+    func setEmbeddedButton(enabled: Bool, pressed: Bool) { uniforms.buttonEnabled = enabled ? 1 : 0; targetButtonPressed = pressed ? 1 : 0 }
     func setHighlightOnly(_ enabled: Bool, shapeKind: Float, shine: Float, blur: Float, glare: Float) {
         uniforms.highlightOnly = enabled ? 1 : 0
         uniforms.shapeKind = shapeKind
@@ -238,6 +245,9 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
         let now = CACurrentMediaTime(), dt = Float(min(0.05, now-lastTime)); lastTime = now
         let blend = 1 - exp(-dt * 12)
         currentTilt += (targetTilt-currentTilt)*blend; currentPointer += (targetPointer-currentPointer)*blend; currentGlare += (targetGlare-currentGlare)*blend
+        let pressBlend = 1 - exp(-dt * 19)
+        currentButtonPressed += (targetButtonPressed - currentButtonPressed) * pressBlend
+        uniforms.buttonPressed = currentButtonPressed
         uniforms.size = SIMD2(Float(view.bounds.width), Float(view.bounds.height))
         uniforms.scale = Float(view.drawableSize.width / max(view.bounds.width, 1))
         uniforms.tilt = SIMD2(currentTilt.y * 0.20943951, -currentTilt.x * 0.20943951)
