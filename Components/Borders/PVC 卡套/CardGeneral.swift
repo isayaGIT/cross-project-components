@@ -215,12 +215,18 @@ public struct CardGeneral<S: Shape, Content: View>: View {
         content
             .clipShape(shape)
             .overlay {
-                CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme)
-                    // Render the rim above caller content so its inner half cannot be
-                    // covered by the face. The centered stroke mask leaves the face
-                    // transparent and the Metal view bounds naturally trim the outer half.
-                    .mask { shape.stroke(lineWidth: thickness * 0.7) }
-                    .allowsHitTesting(false)
+                ZStack {
+                    CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme)
+                        .mask { shape.stroke(lineWidth: thickness * 0.25) }
+
+                    // Experimental second pass: restore a soft white specular highlight
+                    // over the narrow rim without changing the saved 0.7x checkpoint.
+                    CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: SIMD3<Float>(repeating: 1), theme: 1)
+                        .mask { shape.stroke(lineWidth: thickness * 0.25) }
+                        .blendMode(.screen)
+                        .opacity(0.28)
+                }
+                .allowsHitTesting(false)
             }
             .shadow(color: palette.primaryShadow, radius: 22, x: 0, y: 22)
             .shadow(color: palette.secondaryShadow, radius: 8, x: 0, y: 6)
