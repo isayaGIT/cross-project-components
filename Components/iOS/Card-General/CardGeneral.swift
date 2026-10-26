@@ -214,13 +214,13 @@ public struct CardGeneral<S: Shape, Content: View>: View {
     public var body: some View {
         content
             .clipShape(shape)
-            .background {
+            .overlay {
                 CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme)
-                    // Keep the existing Metal reflection renderer, but expose it only
-                    // through the input shape's stroked outline. The face remains
-                    // genuinely transparent and the caller's content stays untouched.
+                    // Render the rim above caller content so its inner half cannot be
+                    // covered by the face. The centered stroke mask leaves the face
+                    // transparent and the Metal view bounds naturally trim the outer half.
                     .mask { shape.stroke(lineWidth: thickness * 2) }
-                    .clipShape(shape)
+                    .allowsHitTesting(false)
             }
             .shadow(color: palette.primaryShadow, radius: 22, x: 0, y: 22)
             .shadow(color: palette.secondaryShadow, radius: 8, x: 0, y: 6)
