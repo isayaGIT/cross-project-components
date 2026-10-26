@@ -77,86 +77,88 @@ struct LLMRoutesDemoView: View {
     private let canvas = Color(red: 0.965, green: 0.958, blue: 0.985)
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, 24)
+                    .padding(.top, 62)
+                    .padding(.bottom, 14)
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    sectionHeading("Screens", detail: "Choose a task to configure")
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionHeading("Screens", detail: "Choose a task to configure")
+                            .padding(.horizontal, 24)
+                            .padding(.top, 8)
+                            .padding(.bottom, 10)
+
+                        screenCarousel
+                            .padding(.bottom, 17)
+
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("LLM routes")
+                                .font(.system(size: 23, weight: .bold, design: .rounded))
+                                .tracking(-0.55)
+                                .foregroundStyle(ink)
+                            Spacer()
+                            Text("\(routes.count) TASKS")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .tracking(1.15)
+                                .foregroundStyle(muted)
+                        }
                         .padding(.horizontal, 24)
-                        .padding(.top, 8)
                         .padding(.bottom, 10)
 
-                    screenCarousel
-                        .padding(.bottom, 17)
-
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("LLM routes")
-                            .font(.system(size: 23, weight: .bold, design: .rounded))
-                            .tracking(-0.55)
-                            .foregroundStyle(ink)
-                        Spacer()
-                        Text("\(routes.count) TASKS")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .tracking(1.15)
-                            .foregroundStyle(muted)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 10)
-
-                    VStack(spacing: 0) {
-                        ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
-                            routeRow(route)
-                            if index < routes.count - 1 {
-                                Rectangle()
-                                    .fill(Color(red: 0.91, green: 0.89, blue: 0.94))
-                                    .frame(height: 1)
-                                    .padding(.leading, 68)
-                                    .padding(.trailing, 16)
+                        VStack(spacing: 0) {
+                            ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
+                                routeRow(route)
+                                if index < routes.count - 1 {
+                                    Rectangle()
+                                        .fill(Color(red: 0.91, green: 0.89, blue: 0.94))
+                                        .frame(height: 1)
+                                        .padding(.leading, 68)
+                                        .padding(.trailing, 16)
+                                }
                             }
                         }
-                    }
-                    .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 25, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 25, style: .continuous)
-                            .strokeBorder(.white.opacity(0.9), lineWidth: 1)
-                    }
-                    .shadow(color: Color(red: 0.43, green: 0.35, blue: 0.63).opacity(0.055), radius: 24, x: 0, y: 10)
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 18)
+                        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 25, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                                .strokeBorder(.white.opacity(0.9), lineWidth: 1)
+                        }
+                        .shadow(color: Color(red: 0.43, green: 0.35, blue: 0.63).opacity(0.055), radius: 24, x: 0, y: 10)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 18)
 
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.shield.fill")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Each task can use its own model")
-                            .font(.system(size: 12, weight: .medium))
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 11, weight: .medium))
+                            Text("Each task can use its own model")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundStyle(muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 32)
                     }
-                    .foregroundStyle(muted)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 22)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .background {
+                ZStack(alignment: .topTrailing) {
+                    canvas
+                    Circle()
+                        .fill(Color(red: 0.87, green: 0.82, blue: 0.99).opacity(0.25))
+                        .frame(width: 270, height: 270)
+                        .blur(radius: 55)
+                        .offset(x: 100, y: -70)
+                    Circle()
+                        .fill(Color(red: 0.97, green: 0.84, blue: 0.90).opacity(0.22))
+                        .frame(width: 220, height: 220)
+                        .blur(radius: 60)
+                        .offset(x: -160, y: 300)
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            ZStack(alignment: .topTrailing) {
-                canvas
-                Circle()
-                    .fill(Color(red: 0.87, green: 0.82, blue: 0.99).opacity(0.25))
-                    .frame(width: 270, height: 270)
-                    .blur(radius: 55)
-                    .offset(x: 100, y: -70)
-                Circle()
-                    .fill(Color(red: 0.97, green: 0.84, blue: 0.90).opacity(0.22))
-                    .frame(width: 220, height: 220)
-                    .blur(radius: 60)
-                    .offset(x: -160, y: 300)
-            }
-            .ignoresSafeArea()
-        }
+        .ignoresSafeArea()
         .preferredColorScheme(.light)
         .sheet(item: $editingTask) { task in
             providerPicker(for: task)

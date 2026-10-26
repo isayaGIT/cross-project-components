@@ -18,6 +18,8 @@ targets:
         PRODUCT_NAME: LLMRoutesDemo
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
     dependencies:
       - package: ScreenMiniature
         product: ScreenMiniature
