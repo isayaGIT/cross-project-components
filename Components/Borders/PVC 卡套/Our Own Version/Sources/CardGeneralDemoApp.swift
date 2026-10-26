@@ -9,7 +9,8 @@ private struct CardGeneralPlayground: View {
     @State private var selectedPalette: CardGeneralPalette = .pearl
     @State private var darkCanvas = false
     @State private var useCircle = false
-    @State private var showContent = false
+    @State private var showContent = true
+    @State private var showEmbeddedButton = true
     @State private var showCenterHighlights = true
     @State private var highlightOpacity = 0.7
     @State private var shadowIntensity = 1.0
@@ -23,6 +24,7 @@ private struct CardGeneralPlayground: View {
                 Toggle("深色画布", isOn: $darkCanvas).labelsHidden()
             }
             Toggle("显示中心 Content", isOn: $showContent)
+            Toggle("显示 Content 内的立体按钮", isOn: $showEmbeddedButton)
             Toggle("显示原版白色高光（中心）", isOn: $showCenterHighlights)
             if showCenterHighlights {
                 HStack { Text("高光强度"); Slider(value: $highlightOpacity, in: 0...1); Text("\(Int(highlightOpacity * 100))%") }
@@ -58,9 +60,9 @@ private struct CardGeneralPlayground: View {
     @ViewBuilder
     private var demoCard: some View {
         if useCircle {
-            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle) { cardContent }
+            CardGeneral(shape: Circle(), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: showEmbeddedButton, embeddedButtonPressed: false) { cardContent }
         } else {
-            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle) { cardContent }
+            CardGeneral(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), thickness: 7, palette: selectedPalette, shadowIntensity: shadowIntensity, showsCenterHighlights: showCenterHighlights, centerHighlightOpacity: highlightOpacity, centerHighlightUsesCircle: useCircle, embeddedButtonEnabled: showEmbeddedButton, embeddedButtonPressed: false) { cardContent }
         }
     }
 

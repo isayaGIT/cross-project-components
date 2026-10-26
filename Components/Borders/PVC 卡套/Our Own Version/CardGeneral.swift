@@ -25,6 +25,8 @@ private struct CardGeneralMetalUniforms {
     var presence: Float = 1
     var highlightOnly: Float = 0
     var shapeKind: Float = 0
+    var buttonEnabled: Float = 0
+    var buttonPressed: Float = 0
 }
 
 final class CardGeneralMetalRenderer: NSObject, MTKViewDelegate {
@@ -43,7 +45,7 @@ final class CardGeneralMetalRenderer: NSObject, MTKViewDelegate {
     private static let shaderSource = #"""
 #include <metal_stdlib>
 using namespace metal;
-struct CardGeneralMetalUniforms { float2 size; float2 pointer; float2 tilt; float scale; float time; float radius; float metalness; float roughness; float blur; float warp; float warpScale; float shine; float bevel; float glare; float capture; float grayscale; float theme; float3 tint; float padding; float presence; float highlightOnly; float shapeKind; };
+struct CardGeneralMetalUniforms { float2 size; float2 pointer; float2 tilt; float scale; float time; float radius; float metalness; float roughness; float blur; float warp; float warpScale; float shine; float bevel; float glare; float capture; float grayscale; float theme; float3 tint; float padding; float presence; float highlightOnly; float shapeKind; float buttonEnabled; float buttonPressed; };
 struct RCVertexOut { float4 position [[position]]; float2 uv; };
 vertex RCVertexOut rc_vertex(uint id [[vertex_id]]) {
     constexpr float2 p[3] = {float2(-1,-1),float2(3,-1),float2(-1,3)};
@@ -81,6 +83,37 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     float chamferWidth = min(u.bevel, max(r, 1.0));
     float chamfer = chamferWidth > 0.01 ? 1.0 - smoothstep(0.0, chamferWidth, -d) : 0.0;
     float2 slope = outward * chamfer;
+    // Embedded rounded-rectangle button height field. Its gradient is folded into
+    // the same surface normal used by the existing reflection/highlight pass.
+    if (u.buttonEnabled > 0.5) {
+        float2 bp = p - float2(0.0, -12.0);
+        float2 bHalf = float2(43.0, 16.0);
+        float br = 8.0;
+        float2 bq = abs(bp) - bHalf + br;
+        float bd = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - br;
+        float buttonHeight = (u.buttonPressed > 0.5 ? 2.0 : 7.0);
+        float h = buttonHeight * (1.0 - smoothstep(-1.5, 2.5, bd));
+        // Give the button face a very shallow convex crown as well as a rounded
+        // shoulder. This produces a broad moving specular response across the
+        // face, rather than normals changing only at the perimeter.
+        float faceMask = 1.0 - smoothstep(-2.0, 1.5, bd);
+        float2 faceCoord = bp / bHalf;
+        float crown = 1.0 - 0.22 * dot(faceCoord, faceCoord);
+        float2 faceSlope = -0.22 * faceCoord / bHalf * buttonHeight * faceMask;
+        float eps = 1.5;
+        float2 bx = bp + float2(eps, 0.0); float2 bxm = bp - float2(eps, 0.0);
+        float2 by = bp + float2(0.0, eps); float2 bym = bp - float2(0.0, eps);
+        float dx = length(max(abs(bx) - bHalf + br, 0.0)) + min(max(abs(bx).x - bHalf.x + br, abs(bx).y - bHalf.y + br), 0.0) - br;
+        float dxm = length(max(abs(bxm) - bHalf + br, 0.0)) + min(max(abs(bxm).x - bHalf.x + br, abs(bxm).y - bHalf.y + br), 0.0) - br;
+        float dy = length(max(abs(by) - bHalf + br, 0.0)) + min(max(abs(by).x - bHalf.x + br, abs(by).y - bHalf.y + br), 0.0) - br;
+        float dym = length(max(abs(bym) - bHalf + br, 0.0)) + min(max(abs(bym).x - bHalf.x + br, abs(bym).y - bHalf.y + br), 0.0) - br;
+        float hx = (1.0 - smoothstep(-1.5, 2.5, dx)) - (1.0 - smoothstep(-1.5, 2.5, dxm));
+        float hy = (1.0 - smoothstep(-1.5, 2.5, dy)) - (1.0 - smoothstep(-1.5, 2.5, dym));
+        slope += float2(hx, hy) * (u.buttonPressed > 0.5 ? 0.8 : 2.2);
+        slope += faceSlope * faceMask;
+        // Bend the existing environment lookup through the height gradient.
+        p += float2(hx, hy) * h * 1.8 + faceSlope * crown * 1.2;
+    }
     float2 wp = p / (220.0 * u.warpScale);
     float3 w1 = rc_noise(wp); float3 w2 = rc_noise(wp * 2.07 + 13.7);
     float2 ripple = (w1.yz + w2.yz * 0.5) * u.warp; slope += ripple * 0.008;
@@ -167,6 +200,7 @@ fragment float4 rc_fragment(RCVertexOut in [[stage_in]], constant CardGeneralMet
     }
 
     func setPalette(tint: SIMD3<Float>, theme: Float) { uniforms.tint = tint; uniforms.theme = theme }
+    func setEmbeddedButton(enabled: Bool, pressed: Bool) { uniforms.buttonEnabled = enabled ? 1 : 0; uniforms.buttonPressed = pressed ? 1 : 0 }
     func setHighlightOnly(_ enabled: Bool, shapeKind: Float, shine: Float, blur: Float, glare: Float) {
         uniforms.highlightOnly = enabled ? 1 : 0
         uniforms.shapeKind = shapeKind
@@ -198,6 +232,8 @@ struct CardGeneralMetalPlate: UIViewRepresentable {
     var highlightBlur: Float = 6
     var highlightGlare: Float = 0
     var highlightUsesCircle: Bool = false
+    var embeddedButtonEnabled: Bool = false
+    var embeddedButtonPressed: Bool = false
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice()); view.isOpaque = false; view.preferredFramesPerSecond = 60
         context.coordinator.renderer = CardGeneralMetalRenderer(view: view)
@@ -206,6 +242,7 @@ struct CardGeneralMetalPlate: UIViewRepresentable {
     func updateUIView(_ view: MTKView, context: Context) {
         context.coordinator.renderer?.aim(touchPoint, in: view.bounds.size, active: isTouching)
         context.coordinator.renderer?.setPalette(tint: tint, theme: theme)
+        context.coordinator.renderer?.setEmbeddedButton(enabled: embeddedButtonEnabled, pressed: embeddedButtonPressed)
         context.coordinator.renderer?.setHighlightOnly(highlightOnly, shapeKind: highlightUsesCircle ? 1 : 0, shine: highlightShine, blur: highlightBlur, glare: highlightGlare)
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -243,6 +280,8 @@ public struct CardGeneral<S: Shape, Content: View>: View {
     private let centerHighlightBlur: Float
     private let centerHighlightGlare: Float
     private let centerHighlightUsesCircle: Bool
+    private let embeddedButtonEnabled: Bool
+    private let embeddedButtonPressed: Bool
     @State private var touchPoint: CGPoint = .zero
     @State private var isTouching = false
 
@@ -257,6 +296,8 @@ public struct CardGeneral<S: Shape, Content: View>: View {
         centerHighlightBlur: Float = 6,
         centerHighlightGlare: Float = 0,
         centerHighlightUsesCircle: Bool = false,
+        embeddedButtonEnabled: Bool = false,
+        embeddedButtonPressed: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.shape = shape
@@ -269,6 +310,8 @@ public struct CardGeneral<S: Shape, Content: View>: View {
         self.centerHighlightBlur = centerHighlightBlur
         self.centerHighlightGlare = centerHighlightGlare
         self.centerHighlightUsesCircle = centerHighlightUsesCircle
+        self.embeddedButtonEnabled = embeddedButtonEnabled
+        self.embeddedButtonPressed = embeddedButtonPressed
         self.content = content()
     }
 
@@ -277,7 +320,7 @@ public struct CardGeneral<S: Shape, Content: View>: View {
             .clipShape(shape)
             .overlay {
                 ZStack {
-                    CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme)
+                    CardGeneralMetalPlate(touchPoint: $touchPoint, isTouching: $isTouching, tint: palette.tint, theme: palette.theme, embeddedButtonEnabled: embeddedButtonEnabled, embeddedButtonPressed: embeddedButtonPressed)
                         .mask { shape.stroke(lineWidth: thickness * 0.25) }
 
                     // Separate highlight pass, using the selected palette rather than a hard-coded white tint.
@@ -291,7 +334,9 @@ public struct CardGeneral<S: Shape, Content: View>: View {
                             highlightShine: centerHighlightShine,
                             highlightBlur: centerHighlightBlur,
                             highlightGlare: centerHighlightGlare,
-                            highlightUsesCircle: centerHighlightUsesCircle
+                            highlightUsesCircle: centerHighlightUsesCircle,
+                            embeddedButtonEnabled: embeddedButtonEnabled,
+                            embeddedButtonPressed: embeddedButtonPressed
                         )
                         .opacity(centerHighlightOpacity)
                     }
@@ -302,7 +347,7 @@ public struct CardGeneral<S: Shape, Content: View>: View {
             .shadow(color: .black.opacity((palette == .pearl ? 0.12 : 0.55) * shadowIntensity), radius: 22, x: 0, y: 22)
             .shadow(color: .black.opacity((palette == .pearl ? 0.08 : 0.30) * shadowIntensity), radius: 8, x: 0, y: 6)
             .contentShape(shape)
-            .highPriorityGesture(DragGesture(minimumDistance: 0).onChanged { value in
+            .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                 touchPoint = value.location
                 isTouching = true
             }.onEnded { _ in isTouching = false })
@@ -320,7 +365,9 @@ public extension View {
         centerHighlightShine: Float = 1,
         centerHighlightBlur: Float = 6,
         centerHighlightGlare: Float = 0,
-        centerHighlightUsesCircle: Bool = false
+        centerHighlightUsesCircle: Bool = false,
+        embeddedButtonEnabled: Bool = false,
+        embeddedButtonPressed: Bool = false
     ) -> some View {
         CardGeneral(
             shape: shape,
@@ -332,7 +379,9 @@ public extension View {
             centerHighlightShine: centerHighlightShine,
             centerHighlightBlur: centerHighlightBlur,
             centerHighlightGlare: centerHighlightGlare,
-            centerHighlightUsesCircle: centerHighlightUsesCircle
+            centerHighlightUsesCircle: centerHighlightUsesCircle,
+            embeddedButtonEnabled: embeddedButtonEnabled,
+            embeddedButtonPressed: embeddedButtonPressed
         ) { self }
     }
 }
